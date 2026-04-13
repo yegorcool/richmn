@@ -35,9 +35,11 @@ export function GamePage() {
         <div className="game-page__level">Lv.{user?.level ?? 1}</div>
       </div>
 
-      <OrderPanel />
+      <div className="game-page__replica-slot">
+        <CharacterBubble line={line} onDismiss={clearLine} />
+      </div>
 
-      <CharacterBubble line={line} onDismiss={clearLine} />
+      <OrderPanel />
 
       <div className="game-page__field">
         <GameField />

@@ -23,7 +23,7 @@ class ReferralController extends Controller
 
         $link = $platform === 'telegram'
             ? "https://t.me/" . config('telegram.bot_username') . "?start={$user->referral_code}"
-            : "https://max.richmn.com/?ref={$user->referral_code}";
+            : config('miniapp.max_origin') . '/?ref=' . $user->referral_code;
 
         return response()->json([
             'referral_code' => $user->referral_code,

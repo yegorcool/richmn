@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\ResolvesUser;
 use App\Http\Controllers\Controller;
+use App\Models\Generator;
 use App\Models\Item;
 use App\Models\ItemDefinition;
 use App\Services\CharacterLineService;
@@ -41,9 +42,14 @@ class GameController extends Controller
             return $itemArray;
         });
 
+        $generators = $user->generators()->with('theme:id,slug,name')->get();
+        foreach ($generators as $generator) {
+            $generator->refreshCooldownIfExpired();
+        }
+
         return response()->json([
             'items' => $itemsWithImages,
-            'generators' => $user->generators()->with('theme:id,slug,name')->get(),
+            'generators' => $generators,
             'energy' => $energy->getCurrentEnergy($user),
             'energy_max' => config('game.energy.max'),
             'energy_recovery_seconds' => $energy->getRecoverySecondsRemaining($user),
@@ -117,11 +123,18 @@ class GameController extends Controller
         $result = $generators->tap($user, $validated['generator_id']);
 
         if (!$result['success']) {
-            $statusCode = $result['error'] === 'Not enough energy' ? 403 : 422;
+            if ($result['error'] === 'Not enough energy') {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'],
+                ], 403);
+            }
+
             return response()->json([
+                'success' => false,
                 'error' => $result['error'],
                 'cooldown_until' => $result['cooldown_until'] ?? null,
-            ], $statusCode);
+            ]);
         }
 
         return response()->json($result);
@@ -157,5 +170,61 @@ class GameController extends Controller
         ]);
 
         return response()->json(['success' => true, 'item' => $item]);
+    }
+
+    public function moveGenerator(Request $request): JsonResponse
+    {
+        $user = $this->user($request);
+        $validated = $request->validate([
+            'generator_id' => 'required|integer',
+            'grid_x' => 'required|integer|min:0|max:5',
+            'grid_y' => 'required|integer|min:0|max:7',
+        ]);
+
+        $generator = Generator::where('user_id', $user->id)->find($validated['generator_id']);
+        if (!$generator) {
+            return response()->json(['error' => 'Generator not found'], 404);
+        }
+
+        $generator->refreshCooldownIfExpired();
+
+        $gx = $validated['grid_x'];
+        $gy = $validated['grid_y'];
+
+        if ($generator->grid_x === $gx && $generator->grid_y === $gy) {
+            return response()->json([
+                'success' => true,
+                'generator' => $generator->load('theme:id,slug,name'),
+            ]);
+        }
+
+        $itemOccupied = Item::where('user_id', $user->id)
+            ->where('grid_x', $gx)
+            ->where('grid_y', $gy)
+            ->exists();
+
+        if ($itemOccupied) {
+            return response()->json(['error' => 'Cell occupied'], 422);
+        }
+
+        $generatorOccupied = Generator::where('user_id', $user->id)
+            ->where('id', '!=', $generator->id)
+            ->where('grid_x', $gx)
+            ->where('grid_y', $gy)
+            ->exists();
+
+        if ($generatorOccupied) {
+            return response()->json(['error' => 'Cell occupied'], 422);
+        }
+
+        $generator->update([
+            'grid_x' => $gx,
+            'grid_y' => $gy,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'generator' => $generator->fresh()->load('theme:id,slug,name'),
+        ]);
     }
 }

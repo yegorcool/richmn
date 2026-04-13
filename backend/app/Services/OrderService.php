@@ -19,9 +19,10 @@ class OrderService
 
     public function generateOrder(User $user, Character $character): Order
     {
+        $playerLevel = $user->level ?? 1;
         $difficulty = $this->scaleOrderDifficulty($user);
         $availableThemes = Theme::where('is_active', true)
-            ->where('unlock_level', '<=', $user->level)
+            ->where('unlock_level', '<=', $playerLevel)
             ->get();
 
         $itemCount = $difficulty <= 3 ? 1 : ($difficulty <= 6 ? rand(1, 2) : rand(1, 3));
@@ -43,7 +44,7 @@ class OrderService
             ];
         }
 
-        $reward = $this->calculateReward($requiredItems, $user->level);
+        $reward = $this->calculateReward($requiredItems, $playerLevel);
 
         return Order::create([
             'user_id' => $user->id,

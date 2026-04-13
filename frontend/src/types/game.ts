@@ -61,14 +61,20 @@ export interface GameState {
   item_definitions?: ItemDefinitionMap;
 }
 
-export interface TapGeneratorResult {
-  success: boolean;
-  item: GameItem;
-  item_definition?: ItemDefinitionEntry | null;
-  generator: Generator;
-  energy: number;
-  energy_max: number;
-}
+export type TapGeneratorResult =
+  | {
+      success: true;
+      item: GameItem;
+      item_definition?: ItemDefinitionEntry | null;
+      generator: Generator;
+      energy: number;
+      energy_max: number;
+    }
+  | {
+      success: false;
+      error: string;
+      cooldown_until?: string | null;
+    };
 
 export interface Order {
   id: number;

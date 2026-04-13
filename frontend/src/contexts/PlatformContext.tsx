@@ -46,6 +46,10 @@ function buildPlatformApi(): PlatformAPI {
     platform: 'telegram',
     initData: tw?.initData ?? '',
     hapticFeedback: (type) => {
+      // HapticFeedback is Bot API 6.1+; calling it on 6.0 spams the console from telegram-web-app.js
+      if (!tw?.isVersionAtLeast?.('6.1')) {
+        return;
+      }
       const hf = tw?.HapticFeedback;
       if (!hf) {
         return;
@@ -78,6 +82,7 @@ type TelegramWebAppLike = {
   ready: () => void;
   expand: () => void;
   close: () => void;
+  isVersionAtLeast?: (version: string) => boolean;
   HapticFeedback?: {
     impactOccurred: (s: string) => void;
     notificationOccurred: (s: string) => void;

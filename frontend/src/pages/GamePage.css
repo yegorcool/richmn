@@ -26,12 +26,53 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.game-page__replica-slot {
+  flex-shrink: 0;
+  height: 54px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 12px 2px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.game-page__replica-slot .character-bubble {
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.game-page__replica-slot .character-bubble__content {
+  padding: 5px 10px;
+  min-width: 0;
+  overflow: hidden;
+  min-height: calc(10px + 13px * 1.3 * 2);
+}
+
+.game-page__replica-slot .character-bubble__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.game-page__replica-slot .character-bubble__tail {
+  width: 10px;
+  height: 10px;
+  bottom: -4px;
+  left: 24px;
+}
+
 .game-page__field {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 0 8px 8px;
   overflow: hidden;
 }
 

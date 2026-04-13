@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Richmn Admin - @yield('title')</title>
+    @include('admin.partials.favicon')
     @include('admin.partials.theme')
 </head>
 <body class="admin-app">

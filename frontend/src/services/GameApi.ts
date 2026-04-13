@@ -19,6 +19,13 @@ export const gameApi = {
   moveItem: (itemId: number, gridX: number, gridY: number) =>
     apiClient.post<{ success: boolean }>('/game/move-item', { item_id: itemId, grid_x: gridX, grid_y: gridY }),
 
+  moveGenerator: (generatorId: number, gridX: number, gridY: number) =>
+    apiClient.post<{ success: boolean }>('/game/move-generator', {
+      generator_id: generatorId,
+      grid_x: gridX,
+      grid_y: gridY,
+    }),
+
   getOrders: () => apiClient.get<{ orders: Order[] }>('/orders'),
 
   submitOrder: (orderId: number, itemId: number) =>

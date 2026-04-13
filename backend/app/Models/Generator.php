@@ -44,6 +44,31 @@ class Generator extends Model
         return $this->cooldown_until === null || $this->cooldown_until->isPast();
     }
 
+    /**
+     * If cooldown_until is in the past, restore chargeable generators to max_charges
+     * or clear stale cooldown timestamps (so clients and isReady() stay consistent).
+     */
+    public function refreshCooldownIfExpired(): bool
+    {
+        if ($this->cooldown_until === null || !$this->cooldown_until->isPast()) {
+            return false;
+        }
+
+        if ($this->type === 'chargeable') {
+            $updates = ['cooldown_until' => null];
+            if ($this->charges_left <= 0) {
+                $updates['charges_left'] = $this->max_charges;
+            }
+            $this->update($updates);
+
+            return true;
+        }
+
+        $this->update(['cooldown_until' => null]);
+
+        return true;
+    }
+
     public function canMergeWith(Generator $other): bool
     {
         return $this->theme_id === $other->theme_id

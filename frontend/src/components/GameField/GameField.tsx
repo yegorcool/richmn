@@ -9,7 +9,47 @@ import type { GameItem, Generator } from '@/types/game';
 const FIELD_WIDTH = GRID_WIDTH * (CELL_SIZE + CELL_GAP) + CELL_GAP;
 const FIELD_HEIGHT = GRID_HEIGHT * (CELL_SIZE + CELL_GAP) + CELL_GAP;
 
+/** Pixels (screen) before a press on a generator counts as a drag instead of a tap. */
+const GENERATOR_DRAG_THRESHOLD_PX = 12;
+
 const textureCache = new Map<string, Texture>();
+
+/** One background per theme — same `theme_id` always maps to the same color. */
+const THEME_CELL_BG_COLORS = [
+  0xFFB7B2, 0xA8E6CF, 0xD4A5FF, 0xFFE156, 0x87CEEB,
+  0xFF9A76, 0xC9B1FF, 0x98D8C8, 0xF7DC6F, 0xE8B4BC,
+];
+
+function themeCellBgColor(themeId: number): number {
+  const n = THEME_CELL_BG_COLORS.length;
+  const idx = ((themeId % n) + n) % n;
+  return THEME_CELL_BG_COLORS[idx];
+}
+
+/** Iconify SVGs default to a small intrinsic size; rasterize at ~display×DPR so Pixi scaling stays sharp. */
+function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
+  if (!imageUrl.includes('api.iconify.design') || !/\.svg(\?|$)/i.test(imageUrl)) {
+    return imageUrl;
+  }
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  const target = Math.min(256, Math.max(96, Math.ceil(displayLogicalPx * dpr)));
+  const join = imageUrl.includes('?') ? '&' : '?';
+  return `${imageUrl}${join}width=${target}&height=${target}`;
+}
+
+async function loadItemTexture(imageUrl: string, displayLogicalPx: number): Promise<Texture | null> {
+  const resolved = resolveTextureUrl(imageUrl, displayLogicalPx);
+  if (textureCache.has(resolved)) {
+    return textureCache.get(resolved)!;
+  }
+  try {
+    const texture = await Assets.load(resolved);
+    textureCache.set(resolved, texture);
+    return texture;
+  } catch {
+    return null;
+  }
+}
 
 export function GameField() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -17,7 +57,23 @@ export function GameField() {
   const itemSpritesRef = useRef<Map<number, Container>>(new Map());
   const generatorSpritesRef = useRef<Map<number, Container>>(new Map());
   const dragRef = useRef<{ itemId: number; startX: number; startY: number; sprite: Container } | null>(null);
+  const generatorPointerRef = useRef<{
+    generatorId: number;
+    startSpriteX: number;
+    startSpriteY: number;
+    startGridX: number;
+    startGridY: number;
+    pointerStartX: number;
+    pointerStartY: number;
+    dragging: boolean;
+  } | null>(null);
   const animLayerRef = useRef<Container | null>(null);
+  const generatorTooltipDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [generatorTooltip, setGeneratorTooltip] = useState<{
+    message: string;
+    anchorX: number;
+    anchorY: number;
+  } | null>(null);
   const [appReady, setAppReady] = useState(false);
   const { items, generators, energy, setEnergy, refreshState } = useGame();
   const platform = usePlatform();
@@ -49,7 +105,7 @@ export function GameField() {
       await app.init({
         width: FIELD_WIDTH,
         height: FIELD_HEIGHT,
-        backgroundColor: 0xFFF5E6,
+        backgroundAlpha: 0,
         antialias: true,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
@@ -88,6 +144,10 @@ export function GameField() {
       cancelled = true;
       setAppReady(false);
       animLayerRef.current = null;
+      if (generatorTooltipDismissRef.current) {
+        clearTimeout(generatorTooltipDismissRef.current);
+        generatorTooltipDismissRef.current = null;
+      }
       if (appRef.current) {
         appRef.current.destroy(true);
         appRef.current = null;
@@ -252,21 +312,6 @@ export function GameField() {
     container.x = origX;
   };
 
-  // ── Texture Loading ───────────────────────────────────────
-
-  const loadItemTexture = async (imageUrl: string): Promise<Texture | null> => {
-    if (textureCache.has(imageUrl)) {
-      return textureCache.get(imageUrl)!;
-    }
-    try {
-      const texture = await Assets.load(imageUrl);
-      textureCache.set(imageUrl, texture);
-      return texture;
-    } catch {
-      return null;
-    }
-  };
-
   // ── Render ────────────────────────────────────────────────
 
   const renderItems = (app: Application) => {
@@ -310,13 +355,8 @@ export function GameField() {
     container.eventMode = 'static';
     container.cursor = 'pointer';
 
-    const levelColors = [
-      0xFFB7B2, 0xA8E6CF, 0xD4A5FF, 0xFFE156, 0x87CEEB,
-      0xFF9A76, 0xC9B1FF, 0x98D8C8, 0xF7DC6F, 0xFFD700,
-    ];
-
     const bg = new Graphics();
-    const color = levelColors[(item.item_level - 1) % levelColors.length];
+    const color = themeCellBgColor(item.theme_id);
     bg.roundRect(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE, 10);
     bg.fill({ color });
     if (item.item_level >= 8) {
@@ -325,14 +365,15 @@ export function GameField() {
     container.addChild(bg);
 
     if (item.image_url) {
-      loadItemTexture(item.image_url).then((texture) => {
+      const iconSize = CELL_SIZE * 0.65;
+      loadItemTexture(item.image_url, iconSize).then((texture) => {
         if (texture && !container.destroyed) {
           const sprite = new Sprite(texture);
-          const iconSize = CELL_SIZE * 0.65;
           sprite.width = iconSize;
           sprite.height = iconSize;
           sprite.anchor.set(0.5);
           sprite.y = -2;
+          sprite.roundPixels = true;
           container.addChild(sprite);
         }
       });
@@ -345,17 +386,6 @@ export function GameField() {
       themeIcon.y = -8;
       container.addChild(themeIcon);
     }
-
-    const style = new TextStyle({
-      fontSize: 10,
-      fontFamily: 'Arial',
-      fill: 0x4A4A4A,
-      align: 'center',
-    });
-    const label = new Text({ text: `Lv${item.item_level}`, style });
-    label.anchor.set(0.5);
-    label.y = CELL_SIZE / 2 - 10;
-    container.addChild(label);
 
     // ── Drag & Drop ──
 
@@ -459,8 +489,7 @@ export function GameField() {
 
     const bg = new Graphics();
     bg.roundRect(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE, 10);
-    bg.fill({ color: gen.type === 'chargeable' ? 0xFFE4B5 : 0xB5E4FF });
-    bg.stroke({ color: 0xCCBBAA, width: 2 });
+    bg.fill({ color: themeCellBgColor(gen.theme_id) });
     container.addChild(bg);
 
     const slug = gen.theme?.slug;
@@ -490,15 +519,16 @@ export function GameField() {
     };
 
     if (imageUrl) {
-      loadItemTexture(imageUrl).then((texture) => {
+      const iconSize = CELL_SIZE * 0.55;
+      loadItemTexture(imageUrl, iconSize).then((texture) => {
         if (container.destroyed) return;
         if (texture) {
           const sprite = new Sprite(texture);
-          const iconSize = CELL_SIZE * 0.55;
           sprite.width = iconSize;
           sprite.height = iconSize;
           sprite.anchor.set(0.5);
           sprite.y = -4;
+          sprite.roundPixels = true;
           insertGeneratorIcon(sprite);
         } else {
           addEmojiIcon();
@@ -508,7 +538,7 @@ export function GameField() {
       addEmojiIcon();
     }
 
-    container.on('pointertap', async () => {
+    const runGeneratorTap = async () => {
       if (energyRef.current <= 0) {
         platform.hapticFeedback('notification');
         shakeSprite(container);
@@ -519,6 +549,36 @@ export function GameField() {
       try {
         platform.hapticFeedback('selection');
         const result = await gameApi.tapGenerator(gen.id);
+
+        if (!result.success) {
+          platform.hapticFeedback('notification');
+          shakeSprite(container);
+          if (result.error === 'Generator not ready') {
+            if (generatorTooltipDismissRef.current) {
+              clearTimeout(generatorTooltipDismissRef.current);
+            }
+            const msg = formatGeneratorNotReadyMessage(result.cooldown_until);
+            const host = canvasRef.current;
+            let anchorX = window.innerWidth / 2;
+            let anchorY = window.innerHeight / 2;
+            if (host) {
+              const r = host.getBoundingClientRect();
+              const sx = r.width / FIELD_WIDTH;
+              const sy = r.height / FIELD_HEIGHT;
+              const centerX = CELL_GAP + gen.grid_x * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
+              const cellTop = CELL_GAP + gen.grid_y * (CELL_SIZE + CELL_GAP);
+              anchorX = r.left + centerX * sx;
+              anchorY = r.top + cellTop * sy;
+            }
+            setGeneratorTooltip({ message: msg, anchorX, anchorY });
+            generatorTooltipDismissRef.current = setTimeout(() => {
+              setGeneratorTooltip(null);
+              generatorTooltipDismissRef.current = null;
+            }, 4000);
+          }
+          return;
+        }
+
         setEnergy(result.energy);
 
         const genPos = gridToPixel(gen.grid_x, gen.grid_y);
@@ -530,8 +590,13 @@ export function GameField() {
         if (newSprite) {
           await playSpawnAnimation(newSprite, genPos.x, genPos.y, itemPos.x, itemPos.y);
         }
-      } catch (err: any) {
-        if (err?.response?.status === 403) {
+      } catch (err: unknown) {
+        if (
+          err &&
+          typeof err === 'object' &&
+          'response' in err &&
+          (err as { response?: { status?: number } }).response?.status === 403
+        ) {
           platform.hapticFeedback('notification');
           shakeSprite(container);
           window.dispatchEvent(new CustomEvent('no-energy'));
@@ -539,24 +604,161 @@ export function GameField() {
           console.error('Generator tap failed', err);
         }
       }
+    };
+
+    const finishGeneratorPointer = async (e: FederatedPointerEvent, releasedOutside: boolean) => {
+      const ptr = generatorPointerRef.current;
+      if (!ptr || ptr.generatorId !== gen.id) return;
+
+      if (ptr.dragging) {
+        generatorPointerRef.current = null;
+        container.alpha = 1;
+        container.scale.set(1);
+        container.zIndex = 0;
+
+        if (!container.parent) return;
+        const pos = e.getLocalPosition(container.parent);
+        const { gx, gy } = pixelToGrid(pos.x, pos.y);
+
+        if (gx < 0 || gx >= GRID_WIDTH || gy < 0 || gy >= GRID_HEIGHT) {
+          container.x = ptr.startSpriteX;
+          container.y = ptr.startSpriteY;
+          return;
+        }
+
+        if (gx === ptr.startGridX && gy === ptr.startGridY) {
+          container.x = ptr.startSpriteX;
+          container.y = ptr.startSpriteY;
+          return;
+        }
+
+        try {
+          await gameApi.moveGenerator(gen.id, gx, gy);
+          await refreshState();
+        } catch {
+          container.x = ptr.startSpriteX;
+          container.y = ptr.startSpriteY;
+        }
+        return;
+      }
+
+      generatorPointerRef.current = null;
+      if (!releasedOutside) {
+        await runGeneratorTap();
+      }
+    };
+
+    container.on('pointerdown', (e: FederatedPointerEvent) => {
+      generatorPointerRef.current = {
+        generatorId: gen.id,
+        startSpriteX: container.x,
+        startSpriteY: container.y,
+        startGridX: gen.grid_x,
+        startGridY: gen.grid_y,
+        pointerStartX: e.global.x,
+        pointerStartY: e.global.y,
+        dragging: false,
+      };
+    });
+
+    container.on('globalpointermove', (e: FederatedPointerEvent) => {
+      const ptr = generatorPointerRef.current;
+      if (!ptr || ptr.generatorId !== gen.id || !container.parent) return;
+      const dist = Math.hypot(e.global.x - ptr.pointerStartX, e.global.y - ptr.pointerStartY);
+      if (dist > GENERATOR_DRAG_THRESHOLD_PX) {
+        if (!ptr.dragging) {
+          ptr.dragging = true;
+          container.alpha = 0.8;
+          container.scale.set(1.1);
+          container.zIndex = 1000;
+        }
+        const pos = e.getLocalPosition(container.parent);
+        container.x = pos.x;
+        container.y = pos.y;
+      }
+    });
+
+    container.on('pointerup', (e: FederatedPointerEvent) => {
+      void finishGeneratorPointer(e, false);
+    });
+
+    container.on('pointerupoutside', (e: FederatedPointerEvent) => {
+      void finishGeneratorPointer(e, true);
     });
 
     return container;
   };
 
   return (
-    <div
-      ref={canvasRef}
-      style={{
-        width: FIELD_WIDTH,
-        height: FIELD_HEIGHT,
-        margin: '0 auto',
-        borderRadius: 16,
-        overflow: 'hidden',
-        touchAction: 'none',
-      }}
-    />
+    <>
+      <div
+        ref={canvasRef}
+        style={{
+          width: FIELD_WIDTH,
+          height: FIELD_HEIGHT,
+          margin: '0 auto',
+          borderRadius: 16,
+          overflow: 'hidden',
+          touchAction: 'none',
+        }}
+      />
+      {generatorTooltip && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            left: generatorTooltip.anchorX,
+            top: generatorTooltip.anchorY,
+            transform: 'translate(-50%, calc(-100% - 8px))',
+            maxWidth: 220,
+            padding: '5px 7px',
+            borderRadius: 8,
+            background: 'rgba(44, 36, 28, 0.92)',
+            color: '#f5f0e8',
+            fontSize: 9,
+            lineHeight: 1.25,
+            textAlign: 'center',
+            whiteSpace: 'pre-line',
+            pointerEvents: 'none',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+            zIndex: 2500,
+          }}
+        >
+          {generatorTooltip.message}
+        </div>
+      )}
+    </>
   );
+}
+
+/** User-facing copy when the server rejects a tap while the generator is on cooldown. */
+function formatGeneratorNotReadyMessage(cooldownUntil: string | null | undefined): string {
+  const lines = (third: string) => `Перезарядка.\nОсталось:\n${third}`;
+
+  if (!cooldownUntil) {
+    return lines('ждите ⏳');
+  }
+  const end = new Date(cooldownUntil).getTime();
+  const ms = end - Date.now();
+  if (Number.isNaN(end)) {
+    return lines('скоро');
+  }
+  if (ms <= 0) {
+    return lines('скоро');
+  }
+  const totalSec = Math.ceil(ms / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  let timePhrase: string;
+  if (hours > 0) {
+    timePhrase = `${hours}\u00a0ч ${mins}\u00a0мин`;
+  } else if (mins > 0) {
+    timePhrase = secs > 0 ? `${mins}\u00a0мин ${secs}\u00a0с` : `${mins}\u00a0мин`;
+  } else {
+    timePhrase = `${secs}\u00a0с`;
+  }
+  return lines(timePhrase);
 }
 
 // ── Easing Functions ──────────────────────────────────────

@@ -20,6 +20,8 @@ class GeneratorService
             return ['success' => false, 'error' => 'Generator not found'];
         }
 
+        $generator->refreshCooldownIfExpired();
+
         if (!$generator->isReady()) {
             return [
                 'success' => false,
@@ -130,10 +132,12 @@ class GeneratorService
         $occupied = Item::where('user_id', $user->id)
             ->get(['grid_x', 'grid_y'])
             ->map(fn($i) => "{$i->grid_x},{$i->grid_y}")
+            ->toBase()
             ->merge(
                 Generator::where('user_id', $user->id)
                     ->get(['grid_x', 'grid_y'])
                     ->map(fn($g) => "{$g->grid_x},{$g->grid_y}")
+                    ->toBase()
             )
             ->toArray();
 
