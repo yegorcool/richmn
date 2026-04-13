@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Richmn</title>
+    <!-- telegram-web-app.js logs every postEvent/receiveEvent; filter before the script runs -->
+    <script>
+      (function () {
+        var orig = console.log.bind(console);
+        console.log = function () {
+          var a0 = arguments[0];
+          if (typeof a0 === 'string' && a0.indexOf('[Telegram.WebView]') === 0) return;
+          return orig.apply(console, arguments);
+        };
+      })();
+    </script>
+    <!-- Sync load before the app bundle so initData is available on first tick (same idea as TopLiga) -->
+    <script src="https://telegram.org/js/telegram-web-app.js?57"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

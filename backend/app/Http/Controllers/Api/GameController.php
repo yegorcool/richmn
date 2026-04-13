@@ -1,0 +1,161 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Api\Concerns\ResolvesUser;
+use App\Http\Controllers\Controller;
+use App\Models\Item;
+use App\Models\ItemDefinition;
+use App\Services\CharacterLineService;
+use App\Services\EnergyService;
+use App\Services\GameInitService;
+use App\Services\GeneratorService;
+use App\Services\MergeService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class GameController extends Controller
+{
+    use ResolvesUser;
+
+    public function state(Request $request, EnergyService $energy, GameInitService $gameInit): JsonResponse
+    {
+        $user = $this->user($request);
+
+        $gameInit->seedStarterGenerators($user);
+
+        $items = $user->items()->with('theme:id,slug,name,chain_config')->get();
+        $itemDefinitions = ItemDefinition::whereIn(
+            'theme_id',
+            $items->pluck('theme_id')->unique()->merge(
+                $user->generators()->pluck('theme_id')->unique()
+            )
+        )->get()->keyBy(fn($d) => $d->theme_id . '_' . $d->level);
+
+        $itemsWithImages = $items->map(function ($item) use ($itemDefinitions) {
+            $def = $itemDefinitions->get($item->theme_id . '_' . $item->item_level);
+            $itemArray = $item->toArray();
+            $itemArray['theme_slug'] = $item->theme?->slug;
+            $itemArray['image_url'] = $def?->image_path;
+            $itemArray['item_name'] = $def?->name;
+            return $itemArray;
+        });
+
+        return response()->json([
+            'items' => $itemsWithImages,
+            'generators' => $user->generators()->with('theme:id,slug,name')->get(),
+            'energy' => $energy->getCurrentEnergy($user),
+            'energy_max' => config('game.energy.max'),
+            'energy_recovery_seconds' => $energy->getRecoverySecondsRemaining($user),
+            'grid' => config('game.grid'),
+            'item_definitions' => ItemDefinition::with('theme:id,slug')
+                ->get()
+                ->groupBy('theme_id')
+                ->map(fn($defs) => $defs->map(fn($d) => [
+                    'level' => $d->level,
+                    'name' => $d->name,
+                    'slug' => $d->slug,
+                    'image_url' => $d->image_path,
+                ])),
+        ]);
+    }
+
+    public function merge(Request $request, MergeService $merge, CharacterLineService $cls): JsonResponse
+    {
+        $user = $this->user($request);
+        $validated = $request->validate([
+            'item_id_1' => 'required|integer',
+            'item_id_2' => 'required|integer',
+        ]);
+
+        $result = $merge->executeMerge($user, $validated['item_id_1'], $validated['item_id_2']);
+
+        if (!$result['valid']) {
+            return response()->json(['error' => $result['error']], 422);
+        }
+
+        $characterLine = null;
+        $trigger = $result['chain_length'] > 1 ? 'chain_merge' : 'merge_nearby';
+        $activeOrders = $user->activeOrders()->with('character')->get();
+
+        if ($activeOrders->isNotEmpty()) {
+            $order = $activeOrders->first();
+            $character = $order->character;
+            $context = $cls->buildContext($user, $character, $order);
+            $line = $cls->getLine($character, $trigger, $context, $user);
+            if ($line) {
+                $cls->recordShow($user, $line);
+                $characterLine = ['id' => $line->id, 'character_id' => $line->character_id, 'text' => $line->text];
+            }
+        }
+
+        $newItem = $result['new_item'];
+        $itemDef = ItemDefinition::where('theme_id', $newItem->theme_id)
+            ->where('level', $newItem->item_level)
+            ->first();
+
+        return response()->json([
+            'new_item' => array_merge($newItem->toArray(), [
+                'theme_slug' => $newItem->theme?->slug,
+                'image_url' => $itemDef?->image_path,
+                'item_name' => $itemDef?->name,
+            ]),
+            'chain_length' => $result['chain_length'],
+            'energy' => $result['energy'],
+            'experience_gained' => $result['experience_gained'],
+            'character_line' => $characterLine,
+        ]);
+    }
+
+    public function tapGenerator(Request $request, GeneratorService $generators, EnergyService $energy): JsonResponse
+    {
+        $user = $this->user($request);
+        $validated = $request->validate([
+            'generator_id' => 'required|integer',
+        ]);
+
+        $result = $generators->tap($user, $validated['generator_id']);
+
+        if (!$result['success']) {
+            $statusCode = $result['error'] === 'Not enough energy' ? 403 : 422;
+            return response()->json([
+                'error' => $result['error'],
+                'cooldown_until' => $result['cooldown_until'] ?? null,
+            ], $statusCode);
+        }
+
+        return response()->json($result);
+    }
+
+    public function moveItem(Request $request): JsonResponse
+    {
+        $user = $this->user($request);
+        $validated = $request->validate([
+            'item_id' => 'required|integer',
+            'grid_x' => 'required|integer|min:0|max:5',
+            'grid_y' => 'required|integer|min:0|max:7',
+        ]);
+
+        $item = Item::where('user_id', $user->id)->find($validated['item_id']);
+        if (!$item) {
+            return response()->json(['error' => 'Item not found'], 404);
+        }
+
+        $occupied = Item::where('user_id', $user->id)
+            ->where('id', '!=', $item->id)
+            ->where('grid_x', $validated['grid_x'])
+            ->where('grid_y', $validated['grid_y'])
+            ->exists();
+
+        if ($occupied) {
+            return response()->json(['error' => 'Cell occupied'], 422);
+        }
+
+        $item->update([
+            'grid_x' => $validated['grid_x'],
+            'grid_y' => $validated['grid_y'],
+        ]);
+
+        return response()->json(['success' => true, 'item' => $item]);
+    }
+}

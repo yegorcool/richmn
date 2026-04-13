@@ -1,0 +1,99 @@
+.decor-page {
+  padding: 12px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.decor-page__loading {
+  text-align: center;
+  padding: 40px;
+  color: #8A8A8A;
+}
+
+.decor-page__tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.decor-page__tab {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background: white;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: #8A8A8A;
+  transition: all 0.2s;
+}
+
+.decor-page__tab--active {
+  background: linear-gradient(135deg, #D4A5FF, #A8E6CF);
+  color: white;
+  font-weight: 600;
+}
+
+.decor-page__title {
+  font-size: 18px;
+  margin: 0 0 12px;
+  color: #4A4A4A;
+}
+
+.decor-page__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.decor-page__item {
+  background: white;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+
+.decor-page__item--placed {
+  border: 2px solid #A8E6CF;
+}
+
+.decor-page__item-name {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #4A4A4A;
+}
+
+.decor-page__item-styles {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.decor-page__style-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #E0D6C6;
+  border-radius: 50%;
+  background: white;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.decor-page__style-btn--selected {
+  background: #D4A5FF;
+  color: white;
+  border-color: #D4A5FF;
+}
+
+.decor-page__placed-badge {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: #4CAF50;
+  font-weight: 500;
+}
