@@ -71,6 +71,7 @@ export function GameField() {
   const animLayerRef = useRef<Container | null>(null);
   const tapQueueRef = useRef<number[]>([]);
   const tapProcessingRef = useRef(false);
+  const animatingItemIdsRef = useRef<Set<number>>(new Set());
   const generatorTooltipDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [generatorTooltip, setGeneratorTooltip] = useState<{
     message: string;
@@ -262,9 +263,10 @@ export function GameField() {
     fromY: number,
     toX: number,
     toY: number,
+    onLanded?: () => void,
   ) => {
     const layer = animLayerRef.current;
-    if (!layer) return;
+    if (!layer) { onLanded?.(); return; }
 
     const temp = new Container();
     temp.x = fromX;
@@ -307,9 +309,8 @@ export function GameField() {
       .then(() => animateTween(temp, { scaleX: 1, scaleY: 1, x: toX, y: toY }, 150, easeOutQuad))
       .then(() => {
         spawnParticles(fromX, fromY, 0x98D8C8);
-        animateTween(temp, { alpha: 0 }, 100, easeOutQuad).then(() => {
-          temp.destroy();
-        });
+        onLanded?.();
+        temp.destroy();
       });
   };
 
@@ -451,6 +452,9 @@ export function GameField() {
         }
 
         if (result.generator) replaceGenerator(result.generator);
+
+        const itemId = result.item.id;
+        animatingItemIdsRef.current.add(itemId);
         addItem(result.item);
 
         const pending = tapQueueRef.current.length;
@@ -467,6 +471,11 @@ export function GameField() {
           result.item.theme_slug,
           genPos.x, genPos.y,
           itemPos.x, itemPos.y,
+          () => {
+            animatingItemIdsRef.current.delete(itemId);
+            const sprite = itemSpritesRef.current.get(itemId);
+            if (sprite) sprite.alpha = 1;
+          },
         );
       } catch (err: unknown) {
         const is403 =
@@ -553,6 +562,10 @@ export function GameField() {
     container.pivot.set(0, 0);
     container.eventMode = 'static';
     container.cursor = 'pointer';
+
+    if (animatingItemIdsRef.current.has(item.id)) {
+      container.alpha = 0;
+    }
 
     const bg = new Graphics();
     const color = themeCellBgColor(item.theme_id);
