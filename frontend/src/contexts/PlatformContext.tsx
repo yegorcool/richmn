@@ -83,6 +83,7 @@ type TelegramWebAppLike = {
   expand: () => void;
   close: () => void;
   isVersionAtLeast?: (version: string) => boolean;
+  disableVerticalSwipes?: () => void;
   HapticFeedback?: {
     impactOccurred: (s: string) => void;
     notificationOccurred: (s: string) => void;
@@ -135,6 +136,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
       }
       tw.ready();
       tw.expand();
+      if (tw.isVersionAtLeast?.('7.7') && tw.disableVerticalSwipes) {
+        tw.disableVerticalSwipes();
+      }
       commit();
       return true;
     };
