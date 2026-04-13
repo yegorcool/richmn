@@ -56,6 +56,7 @@ export function GameField() {
   const appRef = useRef<Application | null>(null);
   const itemSpritesRef = useRef<Map<number, Container>>(new Map());
   const generatorSpritesRef = useRef<Map<number, Container>>(new Map());
+  const generatorChargeTextRef = useRef<Map<number, Text>>(new Map());
   const dragRef = useRef<{ itemId: number; startX: number; startY: number; sprite: Container } | null>(null);
   const generatorPointerRef = useRef<{
     generatorId: number;
@@ -180,8 +181,7 @@ export function GameField() {
 
     const tick = () => {
       for (const gen of generatorsRef.current) {
-        const container = generatorSpritesRef.current.get(gen.id);
-        const chargeText = container?.userData?.chargeText as Text | undefined;
+        const chargeText = generatorChargeTextRef.current.get(gen.id);
         if (!chargeText) continue;
         chargeText.text = generatorUnderIconLabel(gen);
       }
@@ -524,6 +524,7 @@ export function GameField() {
       sprite.destroy();
     });
     generatorSpritesRef.current.clear();
+    generatorChargeTextRef.current.clear();
 
     const currentItems = itemsRef.current;
     const currentGenerators = generatorsRef.current;
@@ -696,7 +697,7 @@ export function GameField() {
     chargeText.anchor.set(0.5);
     chargeText.y = 14;
     container.addChild(chargeText);
-    container.userData = { ...(container.userData ?? {}), chargeText };
+    generatorChargeTextRef.current.set(gen.id, chargeText);
 
     /** Icon between background (index 0) and charge label (top). */
     const insertGeneratorIcon = (icon: Container) => {
