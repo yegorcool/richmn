@@ -254,18 +254,6 @@ export function GameField() {
     });
   };
 
-  const playSpawnAnimation = async (container: Container, fromX: number, fromY: number, toX: number, toY: number) => {
-    container.x = fromX;
-    container.y = fromY;
-    container.scale.set(0);
-    container.alpha = 1;
-
-    await animateTween(container, { scaleX: 1.25, scaleY: 1.25 }, 200, easeOutBack);
-    await animateTween(container, { scaleX: 1, scaleY: 1, x: toX, y: toY }, 200, easeOutQuad);
-
-    spawnParticles(fromX, fromY, 0x98D8C8);
-  };
-
   const playOverlaySpawnAnimation = (
     themeId: number,
     imageUrl: string | null | undefined,
