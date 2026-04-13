@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GameItem, Generator, Order, Character, User } from '@/types/game';
 import { gameApi } from '@/services/GameApi';
 import { apiClient } from '@/services/ApiClient';
 import { getValidTelegramWidgetQueryParams } from '@/utils/telegramWidgetAuth';
 import { usePlatform } from './PlatformContext';
+
+const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 
 interface GameContextValue {
   user: User | null;
@@ -19,6 +21,11 @@ interface GameContextValue {
   setItems: (items: GameItem[]) => void;
   setEnergy: (energy: number) => void;
   setUser: (user: User) => void;
+  addItem: (item: GameItem) => void;
+  removeItems: (ids: number[]) => void;
+  updateItemPosition: (id: number, gridX: number, gridY: number) => void;
+  replaceGenerator: (generator: Generator) => void;
+  updateGeneratorPosition: (id: number, gridX: number, gridY: number) => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -33,6 +40,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [energy, setEnergy] = useState(50);
   const [energyMax, setEnergyMax] = useState(50);
   const [loading, setLoading] = useState(true);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     apiClient.init(platform.platform, platform.initData);
@@ -46,7 +54,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const initializeGame = async () => {
     try {
-      // Ensure the user row exists (and starter generators are seeded in middleware) before loading field state.
       const userRes = await Promise.resolve(gameApi.getUser())
         .then((value) => ({ status: 'fulfilled' as const, value }))
         .catch((reason) => ({ status: 'rejected' as const, reason }));
@@ -87,6 +94,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       console.error('Failed to initialize game:', err);
     } finally {
       setLoading(false);
+      initializedRef.current = true;
     }
   };
 
@@ -103,11 +111,44 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setOrders(res.orders);
   }, []);
 
+  // --- Granular optimistic updaters ---
+
+  const addItem = useCallback((item: GameItem) => {
+    setItems((prev) => [...prev, item]);
+  }, []);
+
+  const removeItems = useCallback((ids: number[]) => {
+    const idSet = new Set(ids);
+    setItems((prev) => prev.filter((i) => !idSet.has(i.id)));
+  }, []);
+
+  const updateItemPosition = useCallback((id: number, gridX: number, gridY: number) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, grid_x: gridX, grid_y: gridY } : i)));
+  }, []);
+
+  const replaceGenerator = useCallback((generator: Generator) => {
+    setGenerators((prev) => prev.map((g) => (g.id === generator.id ? generator : g)));
+  }, []);
+
+  const updateGeneratorPosition = useCallback((id: number, gridX: number, gridY: number) => {
+    setGenerators((prev) => prev.map((g) => (g.id === id ? { ...g, grid_x: gridX, grid_y: gridY } : g)));
+  }, []);
+
+  // --- Background sync to correct any drift ---
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!initializedRef.current) return;
+      refreshState().catch(() => {});
+    }, BACKGROUND_SYNC_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [refreshState]);
+
   return (
     <GameContext.Provider value={{
       user, items, generators, orders, characters,
       energy, energyMax, loading,
       refreshState, refreshOrders, setItems, setEnergy, setUser,
+      addItem, removeItems, updateItemPosition, replaceGenerator, updateGeneratorPosition,
     }}>
       {children}
     </GameContext.Provider>

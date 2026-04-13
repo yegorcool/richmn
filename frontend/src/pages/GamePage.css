@@ -76,6 +76,15 @@
   overflow: hidden;
 }
 
+.game-page__field-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+}
+
 .game-page__modal-overlay {
   position: fixed;
   inset: 0;

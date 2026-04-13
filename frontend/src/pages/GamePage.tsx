@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
-import { GameField } from '@/components/GameField/GameField';
+import { lazy, Suspense, useState, useEffect } from 'react';
+
+const GameField = lazy(() =>
+  import('@/components/GameField/GameField').then((m) => ({ default: m.GameField })),
+);
 import { OrderPanel } from '@/components/OrderPanel/OrderPanel';
 import { EnergyBar } from '@/components/EnergyBar/EnergyBar';
 import { CharacterBubble, useCharacterBubble } from '@/components/CharacterBubble/CharacterBubble';
@@ -42,7 +45,9 @@ export function GamePage() {
       <OrderPanel />
 
       <div className="game-page__field">
-        <GameField />
+        <Suspense fallback={<div className="game-page__field-loading">Загрузка поля…</div>}>
+          <GameField />
+        </Suspense>
       </div>
 
       {showRefill && (

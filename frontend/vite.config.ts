@@ -33,7 +33,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
+    // Pixi is a full WebGL stack; gzip ~155 kB is fine for a game chunk.
+    chunkSizeWarningLimit: 700,
+    rolldownOptions: {
+      checks: {
+        pluginTimings: false,
+      },
       output: {
         manualChunks(id) {
           if (id.includes('pixi.js')) return 'pixi';

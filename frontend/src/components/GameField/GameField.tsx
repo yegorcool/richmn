@@ -75,7 +75,11 @@ export function GameField() {
     anchorY: number;
   } | null>(null);
   const [appReady, setAppReady] = useState(false);
-  const { items, generators, energy, setEnergy, refreshState } = useGame();
+  const {
+    items, generators, energy, setEnergy,
+    addItem, removeItems, updateItemPosition,
+    replaceGenerator, updateGeneratorPosition,
+  } = useGame();
   const platform = usePlatform();
   const itemsRef = useRef(items);
   const generatorsRef = useRef(generators);
@@ -444,10 +448,10 @@ export function GameField() {
 
           const result = await gameApi.merge(item.id, targetItem.id);
           setEnergy(result.energy);
+          removeItems([item.id, targetItem.id]);
+          addItem(result.new_item);
 
           playChainCombo(targetPos.x, targetPos.y, result.chain_length);
-
-          await refreshState();
 
           if (result.character_line) {
             window.dispatchEvent(new CustomEvent('character-line', { detail: result.character_line }));
@@ -455,16 +459,12 @@ export function GameField() {
         } catch {
           container.x = drag.startX;
           container.y = drag.startY;
-          await refreshState();
         }
       } else {
-        try {
-          await gameApi.moveItem(item.id, gx, gy);
-          await refreshState();
-        } catch {
-          container.x = drag.startX;
-          container.y = drag.startY;
-        }
+        updateItemPosition(item.id, gx, gy);
+        gameApi.moveItem(item.id, gx, gy).catch(() => {
+          updateItemPosition(item.id, pixelToGrid(drag.startX, drag.startY).gx, pixelToGrid(drag.startX, drag.startY).gy);
+        });
       }
     });
 
@@ -580,16 +580,22 @@ export function GameField() {
         }
 
         setEnergy(result.energy);
+        if (result.generator) replaceGenerator(result.generator);
+        addItem(result.item);
 
         const genPos = gridToPixel(gen.grid_x, gen.grid_y);
         const itemPos = gridToPixel(result.item.grid_x, result.item.grid_y);
 
-        await refreshState();
-
-        const newSprite = itemSpritesRef.current.get(result.item.id);
-        if (newSprite) {
-          await playSpawnAnimation(newSprite, genPos.x, genPos.y, itemPos.x, itemPos.y);
-        }
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => {
+            const newSprite = itemSpritesRef.current.get(result.item.id);
+            if (newSprite) {
+              playSpawnAnimation(newSprite, genPos.x, genPos.y, itemPos.x, itemPos.y).then(resolve);
+            } else {
+              resolve();
+            }
+          });
+        });
       } catch (err: unknown) {
         if (
           err &&
@@ -632,13 +638,10 @@ export function GameField() {
           return;
         }
 
-        try {
-          await gameApi.moveGenerator(gen.id, gx, gy);
-          await refreshState();
-        } catch {
-          container.x = ptr.startSpriteX;
-          container.y = ptr.startSpriteY;
-        }
+        updateGeneratorPosition(gen.id, gx, gy);
+        gameApi.moveGenerator(gen.id, gx, gy).catch(() => {
+          updateGeneratorPosition(gen.id, ptr.startGridX, ptr.startGridY);
+        });
         return;
       }
 

@@ -47,7 +47,7 @@ The project is a **monorepo** with shared backend and frontend code. Users from 
 
 ```
 richmn/
-├── backend/                          # Laravel 12 application
+├── backend/                          # Laravel 11 application
 │   ├── app/
 │   │   ├── Console/Commands/         # Artisan commands (notifications, timers, events)
 │   │   ├── Helpers/                  # Utility helpers
@@ -56,9 +56,8 @@ richmn/
 │   │   │   │   ├── Api/              # REST API controllers (/api/*)
 │   │   │   │   └── Admin/            # Admin panel controllers (/admin/*)
 │   │   │   ├── Middleware/
-│   │   │   │   ├── MiniAppValidation.php    # Telegram + MAX initData validation
-│   │   │   │   ├── AdminAuth.php            # Admin session auth
-│   │   │   │   └── CheckAdminRole.php       # Admin RBAC
+│   │   │   │   ├── MiniAppValidation.php    # Telegram + MAX initData; Telegram Login Widget
+│   │   │   │   └── AdminAuth.php            # Admin session auth
 │   │   │   ├── Requests/             # Form request validation
 │   │   │   └── Resources/            # API resource serialization
 │   │   ├── Models/                   # Eloquent models
@@ -112,12 +111,12 @@ richmn/
 | Layer | Technology | Version |
 |---|---|---|
 | **Web Server** | Nginx | latest |
-| **Application** | PHP-FPM + Laravel | PHP 8.2+ / Laravel 12 |
-| **Frontend** | React + TypeScript + Vite | React 19 / Vite 7 / TS 5.8 |
+| **Application** | PHP-FPM + Laravel | PHP 8.2+ / Laravel 11 |
+| **Frontend** | React + TypeScript + Vite | React 19 / Vite 8 / TS ~5.9 |
 | **Database** | MySQL | 8.0+ |
 | **Cache / Queue** | Redis | 7+ |
-| **Telegram SDK** | `@twa-dev/sdk` | latest |
-| **MAX SDK** | MAX MiniApp JS SDK | latest |
+| **Telegram WebApp** | `https://telegram.org/js/telegram-web-app.js` (sync in `index.html`) | — |
+| **MAX MiniApp** | Runtime `window.MaxWebApp` (`initData`) — см. `PlatformContext` | — |
 | **HTTP Client** | Axios | latest |
 | **Routing (FE)** | react-router-dom | v7 |
 
@@ -228,22 +227,45 @@ The same physical person from Telegram and MAX will be stored as two separate ro
 
 ### 6.1 API Routes (`/api/*`)
 
-All routes (except `/api/health`) are protected by `MiniAppValidation` middleware.
+Все маршруты ниже, кроме `GET /api/health`, защищены middleware `miniapp` (`MiniAppValidation`).
 
-| Route Group | Description |
-|---|---|
-| `GET /api/health` | Health check (public) |
-| `/api/user/*` | Profile, stats, settings |
-| `/api/game/*` | Game state, merge operations, energy, generators |
-| `/api/orders/*` | Order list, complete, partial submit |
-| `/api/characters/*` | Character lines, mood, relationship |
-| `/api/events/*` | Active events, progress, rewards |
-| `/api/decor/*` | Decoration state, place/remove decor |
-| `/api/chests/*` | Chest list, open (timer or ad) |
-| `/api/collection/*` | Discovered items album |
-| `/api/referral/*` | Referral info, invite link |
-| `/api/notifications/*` | Notification settings, history |
-| `/api/ads/*` | Ad view callbacks, reward tracking |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check (public) |
+| GET | `/api/user/me` | Текущий пользователь |
+| PATCH | `/api/user/settings` | Настройки пользователя |
+| GET | `/api/game/state` | Состояние поля, генераторы, энергия, сетка, `item_definitions` |
+| POST | `/api/game/merge` | Merge двух предметов |
+| POST | `/api/game/generator/tap` | Тап по генератору |
+| POST | `/api/game/move-item` | Перемещение предмета |
+| POST | `/api/game/move-generator` | Перемещение генератора |
+| GET | `/api/orders` | Активные заказы (при необходимости досоздаётся пул) |
+| POST | `/api/orders/{order}/submit` | Сдача одного предмета в заказ (частично или полностью) |
+| GET | `/api/characters` | Список персонажей |
+| GET | `/api/characters/{character}/line` | Реплика по триггеру и контексту (query) |
+| GET | `/api/energy` | Энергия, максимум, секунды до восстановления, остаток дневных ad-refill |
+| POST | `/api/energy/refill` | Пополнение: `source` = `ad` \| `referral` |
+| GET | `/api/chests` | Сундуки пользователя |
+| POST | `/api/chests/{chest}/open` | Открытие (по таймеру или `ad_skip` при лимите рекламы) |
+| GET | `/api/decor/locations` | Локации и расставленный декор |
+| POST | `/api/decor/place` | Поставить декор |
+| DELETE | `/api/decor/remove` | Убрать декор (тело запроса JSON) |
+| GET | `/api/events/active` | Активные ивенты и прогресс |
+| GET | `/api/events/{event}/progress` | Детали ивента и прогресс |
+| GET | `/api/events/{event}/leaderboard` | Таблица лидеров |
+| GET | `/api/collection` | Коллекция / альбом |
+| GET | `/api/referral` | Реферальный код и статистика |
+| POST | `/api/referral/claim` | Применить реферальный код |
+| POST | `/api/ads/callback` | Учёт показа/завершения рекламы с клиента (`format`, `placement`) |
+| GET | `/api/streak` | Streak |
+| POST | `/api/streak/claim` | Забрать награду streak |
+| GET | `/api/daily-challenge` | Ежедневные задания |
+| POST | `/api/daily-challenge/{challenge}/claim` | Забрать награду за задание (индекс в URL) |
+| POST | `/api/gifts/send` | Отправить подарок |
+| POST | `/api/gifts/claim` | Забрать входящие подарки |
+| POST | `/api/analytics/event` | Пакет игровых аналитических событий |
+
+Отдельного REST-префикса `/api/notifications/*` нет: исходящие уведомления ставятся в очередь в БД и отправляются планировщиком (см. §6.4).
 
 ### 6.2 Admin Routes (`/admin/*`)
 
@@ -263,29 +285,33 @@ Admin panel sections:
 | Service | Responsibility | Status |
 |---|---|---|
 | `MergeService` | Validate and execute merge-2 logic, chain merges, energy deduction, experience gain | ✅ Implemented |
-| `GeneratorService` | Generator tap logic: energy check, spawn level, slot search, cooldown management | ✅ Implemented |
+| `GeneratorService` | Generator tap: energy check, spawn level, slot search, cooldown / charges | ✅ Implemented |
 | `GameInitService` | Place 3 starter generators for new users on first login (idempotent) | ✅ Implemented |
-| `EnergyService` | Track charges, auto-recover, rewarded refill, source-tracked spending | ✅ Implemented |
-| `OrderService` | Generate orders, validate completion, distribute rewards | ✅ Implemented |
-| `CharacterLineService` | Select character line by trigger + conditions (PRD section 6.2) | ✅ Implemented |
-| `EventService` | Manage weekly/seasonal events, progress tracking | Planned |
-| `DecorService` | Track decoration state per location | Planned |
-| `ChestService` | Chest timers, opening logic, loot tables | Planned |
-| `TelegramService` | Validate Telegram WebApp initData, validate Login Widget payloads, send bot notifications | ✅ Implemented |
-| `MaxService` | Validate MAX initData, send push notifications | Planned |
-| `AdService` | Track ad views, enforce daily limits, reward distribution | Planned |
-| `NotificationService` | Send messages via Telegram Bot API / MAX API | Planned |
+| `EnergyService` | Charges, **on-request** auto-recovery math, refill, `energy_logs` | ✅ Implemented |
+| `OrderService` | Orders pool, submit item (partial/complete), rewards | ✅ Implemented |
+| `CharacterLineService` | Реплики по триггеру и контексту, учёт показов | ✅ Implemented |
+| `ChestService` | Создание сундуков, таймеры, лут, выдача наград | ✅ Implemented |
+| `DecorService` | Локации, размещение / снятие декора | ✅ Implemented |
+| `EventService` | Активные ивенты по датам, прогресс, `claimMilestone()` (логика), лидерборд | ✅ Implemented; **HTTP-роута для claim milestone в `api.php` нет** |
+| `StreakService` / `DailyChallengeService` | Streak и ежедневные задания | ✅ Implemented |
+| `TelegramService` | Login Widget validation, отправка сообщений бота | ✅ Implemented |
+| `MaxService` | Исходящие сообщения в MAX (HTTP к `config('max.api_url')`); **валидация `initData` для MAX** — в `MiniAppValidation`, не в сервисе | ✅ Частично (отправка + заглушки текстов уведомлений) |
+| `AdService` | Дневные лимиты и учёт просмотров (`ad_views`) | ✅ Implemented |
+| `NotificationService` | Очередь `notifications`, лимит 3/день, Telegram / MAX | ✅ Implemented |
 
 ### 6.4 Console Commands (Scheduled)
 
+Файл: `backend/routes/console.php`.
+
 | Command | Schedule | Description |
 |---|---|---|
-| `energy:recover` | Every minute | Compute energy recovery for users |
-| `chests:process` | Every minute | Update chest unlock timers |
-| `generators:cooldown` | Every minute | Reset cooldown generators |
-| `notifications:send` | Every minute | Process notification queue |
-| `events:manage` | Daily | Start/end events per schedule |
-| `daily-challenge:rotate` | Daily 00:00 | Generate new daily challenges |
+| `notifications:send` | Every minute | Разбор очереди уведомлений (`NotificationService`) |
+| `energy:check-notifications` | Every 5 minutes | Напоминания о полной энергии (и др. по команде) |
+| `events:manage` | Daily | Управление ивентами по расписанию |
+| `daily-challenge:rotate` | Daily 00:00 | Ротация ежедневных заданий |
+| `streaks:warn` | Daily 20:00 | Предупреждения о streak |
+
+**Не используются отдельные крон-задачи** для «поминутного» восстановления энергии, сундуков и кулдаунов генераторов: восстановление энергии считается при чтении (`EnergyService::getCurrentEnergy`), готовность генератора — через `refreshCooldownIfExpired()` на модели, сундуки — по полю `unlock_at` при открытии.
 
 ---
 
@@ -313,23 +339,29 @@ Hooks:
 
 ### 7.2 API Client
 
-Singleton `ApiClient` class (same pattern as topliga):
-- Base URL: `/api` (relative, proxied by Nginx in prod / Vite in dev)
-- Request interceptor adds `X-Platform-Init-Data` and `X-Platform` headers; for Telegram browser auth, adds Login Widget fields as query parameters
-- Response interceptor handles 401 (clear stored widget payload, dispatch session event)
-- Typed methods for every API endpoint
+Singleton `ApiClient` (`frontend/src/services/ApiClient.ts`):
+- Base URL: `/api` (Nginx в проде; в dev — proxy в `vite.config.ts` на бэкенд, например `localhost:8000`)
+- `GameProvider` вызывает `apiClient.init(platform, initData)` и при отсутствии MiniApp — подставляет поля Telegram Login Widget в query (см. `getValidTelegramWidgetQueryParams`)
+- Заголовки `X-Platform`, `X-Platform-Init-Data` на каждый запрос
+- 401: очистка виджет-сессии, событие `richmn:auth-required` для `AppGate`
 
-### 7.3 Key Components
+Типизированные вызовы собраны в `frontend/src/services/GameApi.ts`.
 
-| Component | Description |
+### 7.3 Key Components & Pages
+
+| Component / page | Description |
 |---|---|
-| `GameField` | 6×8 grid with drag-and-drop merge (Canvas) |
-| `OrderPanel` | Top panel with character avatars and order cards |
-| `CharacterBubble` | Speech bubble with character lines |
-| `EnergyBar` | Charge indicator with recovery timer |
-| `Navigation` | Bottom tab bar (Field, Decor, Events, More) |
-| `ChestModal` | Chest opening with timer / ad option |
-| `DecorEditor` | Location decoration interface |
+| `GamePage` | Поле, заказы, энергия, модал пополнения, реплики |
+| `GameField` | Сетка 6×8, PixiJS, drag-and-drop, merge / move |
+| `OrderPanel` | Панель заказов |
+| `CharacterBubble` | Реплика персонажа |
+| `EnergyBar` | Энергия и кнопка пополнения |
+| `Navigation` | Нижние вкладки: поле, декор, ивенты, ещё |
+| `DecorPage` | Экран декора (данные с `/api/decor/*`) |
+| `EventsPage` | Ежедневные задания и список активных ивентов |
+| `MorePage` | Доп. раздел |
+| `GuestLandingPage` | Браузер без `initData`: Telegram Login Widget |
+| `AuthTelegramPage` | Callback-роут `/login/telegram` после редиректа с Laravel |
 
 ### 7.4 Rendering
 
@@ -355,7 +387,7 @@ item_definitions
 ├── level (tinyint, unsigned) — уровень в цепочке (1–10)
 ├── name (string) — «Эспрессо», «Клубок», «Ваза»
 ├── slug (string) — «coffee_3», «fabrics_2»
-├── image_url (string, nullable) — URL иконки (Iconify API / локальный storage)
+├── image_url (string, nullable) — в БД: внешний URL или путь в `storage`; в JSON API отдаётся готовый URL в поле `image_url` через accessor `image_path` модели `ItemDefinition`
 ├── created_at, updated_at
 └── UNIQUE INDEX (theme_id, level)
 ```
@@ -459,6 +491,7 @@ themes (дополнительные поля)
 | `POST /api/game/generator/tap` | POST | Тап по генератору → спавн предмета, возврат нового предмета с позицией и изображением |
 | `POST /api/game/merge` | POST | Merge двух предметов → новый предмет, chain_length, энергия, опыт, реплика персонажа |
 | `POST /api/game/move-item` | POST | Перемещение предмета на свободную клетку (drag & drop) |
+| `POST /api/game/move-generator` | POST | Перемещение генератора на свободную клетку |
 
 #### Формат ответа `GET /api/game/state`
 
