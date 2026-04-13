@@ -68,6 +68,8 @@ export function GameField() {
     dragging: boolean;
   } | null>(null);
   const animLayerRef = useRef<Container | null>(null);
+  const tapQueueRef = useRef<number[]>([]);
+  const tapProcessingRef = useRef(false);
   const generatorTooltipDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [generatorTooltip, setGeneratorTooltip] = useState<{
     message: string;
@@ -87,7 +89,11 @@ export function GameField() {
 
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { generatorsRef.current = generators; }, [generators]);
-  useEffect(() => { energyRef.current = energy; }, [energy]);
+  useEffect(() => {
+    if (!tapProcessingRef.current && tapQueueRef.current.length === 0) {
+      energyRef.current = energy;
+    }
+  }, [energy]);
 
   const gridToPixel = useCallback((gx: number, gy: number) => ({
     x: CELL_GAP + gx * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2,
@@ -169,9 +175,7 @@ export function GameField() {
     const app = appRef.current;
     if (!appReady || !app) return;
 
-    const anyRecharging = generators.some(
-      (g) => g.charges_left === 0 && g.cooldown_until != null && g.cooldown_until !== '',
-    );
+    const anyRecharging = generators.some(generatorHasActiveRechargeCooldown);
     if (!anyRecharging) return;
 
     const tick = () => {
@@ -179,10 +183,7 @@ export function GameField() {
         const container = generatorSpritesRef.current.get(gen.id);
         const chargeText = container?.userData?.chargeText as Text | undefined;
         if (!chargeText) continue;
-        chargeText.text =
-          gen.charges_left === 0 && gen.cooldown_until
-            ? formatGeneratorCooldownMmSs(gen.cooldown_until)
-            : '';
+        chargeText.text = generatorUnderIconLabel(gen);
       }
     };
 
@@ -265,6 +266,65 @@ export function GameField() {
     spawnParticles(fromX, fromY, 0x98D8C8);
   };
 
+  const playOverlaySpawnAnimation = (
+    themeId: number,
+    imageUrl: string | null | undefined,
+    themeSlug: string | undefined,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+  ) => {
+    const layer = animLayerRef.current;
+    if (!layer) return;
+
+    const temp = new Container();
+    temp.x = fromX;
+    temp.y = fromY;
+    temp.scale.set(0);
+
+    const bg = new Graphics();
+    bg.roundRect(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE, 10);
+    bg.fill({ color: themeCellBgColor(themeId) });
+    temp.addChild(bg);
+
+    const emoji = new Text({
+      text: getThemeEmoji(themeSlug ?? ''),
+      style: new TextStyle({ fontSize: 20 }),
+    });
+    emoji.anchor.set(0.5);
+    emoji.y = -8;
+    temp.addChild(emoji);
+
+    if (imageUrl) {
+      const iconSize = CELL_SIZE * 0.65;
+      loadItemTexture(imageUrl, iconSize).then((texture) => {
+        if (texture && !temp.destroyed) {
+          const sprite = new Sprite(texture);
+          sprite.width = iconSize;
+          sprite.height = iconSize;
+          sprite.anchor.set(0.5);
+          sprite.y = -2;
+          sprite.roundPixels = true;
+          temp.removeChild(emoji);
+          emoji.destroy();
+          temp.addChild(sprite);
+        }
+      });
+    }
+
+    layer.addChild(temp);
+
+    animateTween(temp, { scaleX: 1.25, scaleY: 1.25 }, 150, easeOutBack)
+      .then(() => animateTween(temp, { scaleX: 1, scaleY: 1, x: toX, y: toY }, 150, easeOutQuad))
+      .then(() => {
+        spawnParticles(fromX, fromY, 0x98D8C8);
+        animateTween(temp, { alpha: 0 }, 100, easeOutQuad).then(() => {
+          temp.destroy();
+        });
+      });
+  };
+
   const playMergeAnimation = async (
     sprite1: Container,
     sprite2: Container,
@@ -342,6 +402,124 @@ export function GameField() {
       await new Promise((r) => setTimeout(r, 50));
     }
     container.x = origX;
+  };
+
+  // ── Tap Queue ────────────────────────────────────────────
+
+  const showGeneratorNotReadyTooltip = (generatorId: number, cooldownUntil: string | null | undefined) => {
+    if (generatorTooltipDismissRef.current) {
+      clearTimeout(generatorTooltipDismissRef.current);
+    }
+    const gen = generatorsRef.current.find((g) => g.id === generatorId);
+    if (!gen) return;
+    const msg = formatGeneratorNotReadyMessage(cooldownUntil);
+    const host = canvasRef.current;
+    let anchorX = window.innerWidth / 2;
+    let anchorY = window.innerHeight / 2;
+    if (host) {
+      const r = host.getBoundingClientRect();
+      const sx = r.width / FIELD_WIDTH;
+      const sy = r.height / FIELD_HEIGHT;
+      const centerX = CELL_GAP + gen.grid_x * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
+      const cellTop = CELL_GAP + gen.grid_y * (CELL_SIZE + CELL_GAP);
+      anchorX = r.left + centerX * sx;
+      anchorY = r.top + cellTop * sy;
+    }
+    setGeneratorTooltip({ message: msg, anchorX, anchorY });
+    generatorTooltipDismissRef.current = setTimeout(() => {
+      setGeneratorTooltip(null);
+      generatorTooltipDismissRef.current = null;
+    }, 4000);
+  };
+
+  const processTapQueue = async () => {
+    if (tapProcessingRef.current) return;
+    tapProcessingRef.current = true;
+
+    while (tapQueueRef.current.length > 0) {
+      const generatorId = tapQueueRef.current.shift()!;
+
+      try {
+        const result = await gameApi.tapGenerator(generatorId);
+
+        if (!result.success) {
+          const restoreCount = tapQueueRef.current.length + 1;
+          energyRef.current += restoreCount;
+          setEnergy(energyRef.current);
+          tapQueueRef.current.length = 0;
+
+          const sprite = generatorSpritesRef.current.get(generatorId);
+          if (sprite) {
+            platform.hapticFeedback('notification');
+            shakeSprite(sprite);
+          }
+
+          if (result.error === 'Generator not ready') {
+            showGeneratorNotReadyTooltip(generatorId, result.cooldown_until);
+          } else if (result.error === 'No empty slots') {
+            // field is full, nothing else to do
+          }
+          break;
+        }
+
+        if (result.generator) replaceGenerator(result.generator);
+        addItem(result.item);
+
+        const pending = tapQueueRef.current.length;
+        energyRef.current = result.energy - pending;
+        setEnergy(energyRef.current);
+
+        const gen = generatorsRef.current.find((g) => g.id === generatorId);
+        const genPos = gen ? gridToPixel(gen.grid_x, gen.grid_y) : gridToPixel(0, 0);
+        const itemPos = gridToPixel(result.item.grid_x, result.item.grid_y);
+
+        playOverlaySpawnAnimation(
+          result.item.theme_id,
+          result.item.image_url,
+          result.item.theme_slug,
+          genPos.x, genPos.y,
+          itemPos.x, itemPos.y,
+        );
+      } catch (err: unknown) {
+        const is403 =
+          err && typeof err === 'object' && 'response' in err &&
+          (err as { response?: { status?: number } }).response?.status === 403;
+
+        const restoreCount = tapQueueRef.current.length + 1;
+        energyRef.current += restoreCount;
+        setEnergy(energyRef.current);
+        tapQueueRef.current.length = 0;
+
+        if (is403) {
+          platform.hapticFeedback('notification');
+          const sprite = generatorSpritesRef.current.get(generatorId);
+          if (sprite) shakeSprite(sprite);
+          window.dispatchEvent(new CustomEvent('no-energy'));
+        } else {
+          console.error('Generator tap failed', err);
+        }
+        break;
+      }
+    }
+
+    tapProcessingRef.current = false;
+  };
+
+  const enqueueGeneratorTap = (generatorId: number) => {
+    if (energyRef.current <= 0) {
+      platform.hapticFeedback('notification');
+      const sprite = generatorSpritesRef.current.get(generatorId);
+      if (sprite) shakeSprite(sprite);
+      window.dispatchEvent(new CustomEvent('no-energy'));
+      return;
+    }
+
+    energyRef.current -= 1;
+    setEnergy(energyRef.current);
+    platform.hapticFeedback('selection');
+
+    tapQueueRef.current.push(generatorId);
+    processTapQueue();
   };
 
   // ── Render ────────────────────────────────────────────────
@@ -524,16 +702,13 @@ export function GameField() {
     const imageUrl = slug ? getGeneratorImageUrl(slug) : null;
 
     const chargeText = new Text({
-      text:
-        gen.charges_left === 0 && gen.cooldown_until
-          ? formatGeneratorCooldownMmSs(gen.cooldown_until)
-          : '',
+      text: generatorUnderIconLabel(gen),
       style: new TextStyle({ fontSize: 10, fill: 0x666666 }),
     });
     chargeText.anchor.set(0.5);
     chargeText.y = 14;
     container.addChild(chargeText);
-    container.userData.chargeText = chargeText;
+    container.userData = { ...(container.userData ?? {}), chargeText };
 
     /** Icon between background (index 0) and charge label (top). */
     const insertGeneratorIcon = (icon: Container) => {
@@ -570,80 +745,6 @@ export function GameField() {
       addEmojiIcon();
     }
 
-    const runGeneratorTap = async () => {
-      if (energyRef.current <= 0) {
-        platform.hapticFeedback('notification');
-        shakeSprite(container);
-        window.dispatchEvent(new CustomEvent('no-energy'));
-        return;
-      }
-
-      try {
-        platform.hapticFeedback('selection');
-        const result = await gameApi.tapGenerator(gen.id);
-
-        if (!result.success) {
-          platform.hapticFeedback('notification');
-          shakeSprite(container);
-          if (result.error === 'Generator not ready') {
-            if (generatorTooltipDismissRef.current) {
-              clearTimeout(generatorTooltipDismissRef.current);
-            }
-            const msg = formatGeneratorNotReadyMessage(result.cooldown_until);
-            const host = canvasRef.current;
-            let anchorX = window.innerWidth / 2;
-            let anchorY = window.innerHeight / 2;
-            if (host) {
-              const r = host.getBoundingClientRect();
-              const sx = r.width / FIELD_WIDTH;
-              const sy = r.height / FIELD_HEIGHT;
-              const centerX = CELL_GAP + gen.grid_x * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
-              const cellTop = CELL_GAP + gen.grid_y * (CELL_SIZE + CELL_GAP);
-              anchorX = r.left + centerX * sx;
-              anchorY = r.top + cellTop * sy;
-            }
-            setGeneratorTooltip({ message: msg, anchorX, anchorY });
-            generatorTooltipDismissRef.current = setTimeout(() => {
-              setGeneratorTooltip(null);
-              generatorTooltipDismissRef.current = null;
-            }, 4000);
-          }
-          return;
-        }
-
-        setEnergy(result.energy);
-        if (result.generator) replaceGenerator(result.generator);
-        addItem(result.item);
-
-        const genPos = gridToPixel(gen.grid_x, gen.grid_y);
-        const itemPos = gridToPixel(result.item.grid_x, result.item.grid_y);
-
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => {
-            const newSprite = itemSpritesRef.current.get(result.item.id);
-            if (newSprite) {
-              playSpawnAnimation(newSprite, genPos.x, genPos.y, itemPos.x, itemPos.y).then(resolve);
-            } else {
-              resolve();
-            }
-          });
-        });
-      } catch (err: unknown) {
-        if (
-          err &&
-          typeof err === 'object' &&
-          'response' in err &&
-          (err as { response?: { status?: number } }).response?.status === 403
-        ) {
-          platform.hapticFeedback('notification');
-          shakeSprite(container);
-          window.dispatchEvent(new CustomEvent('no-energy'));
-        } else {
-          console.error('Generator tap failed', err);
-        }
-      }
-    };
-
     const finishGeneratorPointer = async (e: FederatedPointerEvent, releasedOutside: boolean) => {
       const ptr = generatorPointerRef.current;
       if (!ptr || ptr.generatorId !== gen.id) return;
@@ -679,7 +780,7 @@ export function GameField() {
 
       generatorPointerRef.current = null;
       if (!releasedOutside) {
-        await runGeneratorTap();
+        enqueueGeneratorTap(gen.id);
       }
     };
 
@@ -764,6 +865,19 @@ export function GameField() {
       )}
     </>
   );
+}
+
+/** True while generator is empty and server-side cooldown is still in the future. */
+function generatorHasActiveRechargeCooldown(gen: Generator): boolean {
+  if (gen.charges_left > 0 || !gen.cooldown_until) return false;
+  const end = new Date(gen.cooldown_until).getTime();
+  return !Number.isNaN(end) && end > Date.now();
+}
+
+/** Under-icon line: nothing if charges remain or no active cooldown (no checkmark-style hint). */
+function generatorUnderIconLabel(gen: Generator): string {
+  if (!generatorHasActiveRechargeCooldown(gen)) return '';
+  return formatGeneratorCooldownMmSs(gen.cooldown_until);
 }
 
 /** Countdown under generator icon while recharging (mm:ss, minutes unbounded). */
