@@ -10,7 +10,7 @@
 
 <div class="card card--muted">
     <div class="grid-4" style="font-size:0.8125rem;">
-        <div><strong>Генератор:</strong> {{ $theme->generator_name }} ({{ $theme->generator_type }})</div>
+        <div><strong>Генератор:</strong> {{ $theme->generator_name }}</div>
         <div><strong>Энергия:</strong> {{ $theme->generator_energy_cost }} за генерацию</div>
         <div><strong>Лимит:</strong> {{ $theme->generator_generation_limit }} генераций</div>
         <div><strong>Таймаут:</strong> {{ $theme->generator_generation_timeout }}с</div>

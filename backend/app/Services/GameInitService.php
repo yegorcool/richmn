@@ -45,7 +45,6 @@ class GameInitService
                 Generator::create([
                     'user_id' => $user->id,
                     'theme_id' => $theme->id,
-                    'type' => $theme->generator_type,
                     'level' => 1,
                     'charges_left' => $limit,
                     'max_charges' => $limit,

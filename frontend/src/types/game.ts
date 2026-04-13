@@ -30,7 +30,6 @@ export interface GameItem {
 export interface Generator {
   id: number;
   theme_id: number;
-  type: 'chargeable' | 'cooldown';
   level: number;
   charges_left: number;
   max_charges: number;

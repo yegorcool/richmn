@@ -13,7 +13,6 @@
                 <th>ID</th>
                 <th>Название</th>
                 <th>Slug</th>
-                <th>Тип генератора</th>
                 <th>Генератор</th>
                 <th>Разблокировка</th>
                 <th>Предметов</th>
@@ -39,7 +38,6 @@
                 <td>{{ $theme->id }}</td>
                 <td>{{ $theme->name }}</td>
                 <td><code>{{ $theme->slug }}</code></td>
-                <td>{{ $theme->generator_type }}</td>
                 <td>{{ $theme->generator_name }}</td>
                 <td>Lv.{{ $theme->unlock_level }}</td>
                 <td>

@@ -165,6 +165,34 @@ export function GameField() {
     }
   }, [items, generators, appReady]);
 
+  useEffect(() => {
+    const app = appRef.current;
+    if (!appReady || !app) return;
+
+    const anyRecharging = generators.some(
+      (g) => g.charges_left === 0 && g.cooldown_until != null && g.cooldown_until !== '',
+    );
+    if (!anyRecharging) return;
+
+    const tick = () => {
+      for (const gen of generatorsRef.current) {
+        const container = generatorSpritesRef.current.get(gen.id);
+        const chargeText = container?.userData?.chargeText as Text | undefined;
+        if (!chargeText) continue;
+        chargeText.text =
+          gen.charges_left === 0 && gen.cooldown_until
+            ? formatGeneratorCooldownMmSs(gen.cooldown_until)
+            : '';
+      }
+    };
+
+    app.ticker.add(tick);
+    tick();
+    return () => {
+      app.ticker.remove(tick);
+    };
+  }, [generators, appReady]);
+
   const drawGrid = (app: Application) => {
     const grid = new Graphics();
 
@@ -496,12 +524,16 @@ export function GameField() {
     const imageUrl = slug ? getGeneratorImageUrl(slug) : null;
 
     const chargeText = new Text({
-      text: gen.type === 'chargeable' ? `${gen.charges_left}/${gen.max_charges}` : (gen.cooldown_until ? '⏳' : '✓'),
+      text:
+        gen.charges_left === 0 && gen.cooldown_until
+          ? formatGeneratorCooldownMmSs(gen.cooldown_until)
+          : '',
       style: new TextStyle({ fontSize: 10, fill: 0x666666 }),
     });
     chargeText.anchor.set(0.5);
     chargeText.y = 14;
     container.addChild(chargeText);
+    container.userData.chargeText = chargeText;
 
     /** Icon between background (index 0) and charge label (top). */
     const insertGeneratorIcon = (icon: Container) => {
@@ -732,6 +764,18 @@ export function GameField() {
       )}
     </>
   );
+}
+
+/** Countdown under generator icon while recharging (mm:ss, minutes unbounded). */
+function formatGeneratorCooldownMmSs(cooldownUntil: string | null | undefined): string {
+  if (!cooldownUntil) return '0:00';
+  const end = new Date(cooldownUntil).getTime();
+  const ms = end - Date.now();
+  if (Number.isNaN(end) || ms <= 0) return '0:00';
+  const totalSec = Math.ceil(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 /** User-facing copy when the server rejects a tap while the generator is on cooldown. */

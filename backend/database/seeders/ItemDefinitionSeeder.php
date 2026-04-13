@@ -28,13 +28,12 @@ class ItemDefinitionSeeder extends Seeder
             ['slug' => 'coffee'],
             [
                 'name' => 'Кофейня',
-                'generator_type' => 'chargeable',
                 'generator_name' => 'Кофемашина',
                 'unlock_level' => 1,
                 'is_active' => true,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 1800,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 180,
                 'chain_config' => [],
             ]
         );
@@ -61,13 +60,12 @@ class ItemDefinitionSeeder extends Seeder
             ['slug' => 'bakery'],
             [
                 'name' => 'Выпечка',
-                'generator_type' => 'chargeable',
                 'generator_name' => 'Духовка',
                 'unlock_level' => 3,
                 'is_active' => true,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 1800,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 360,
                 'chain_config' => [],
             ]
         );
@@ -94,13 +92,12 @@ class ItemDefinitionSeeder extends Seeder
             ['slug' => 'products'],
             [
                 'name' => 'Продукты',
-                'generator_type' => 'cooldown',
                 'generator_name' => 'Грядка',
                 'unlock_level' => 5,
                 'is_active' => true,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 2400,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 300,
                 'chain_config' => [],
             ]
         );
@@ -127,13 +124,12 @@ class ItemDefinitionSeeder extends Seeder
             ['slug' => 'fabrics'],
             [
                 'name' => 'Ткани',
-                'generator_type' => 'chargeable',
                 'generator_name' => 'Швейная машинка',
                 'unlock_level' => 24,
                 'is_active' => true,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 1800,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 225,
                 'chain_config' => [],
             ]
         );
@@ -160,13 +156,12 @@ class ItemDefinitionSeeder extends Seeder
             ['slug' => 'pottery'],
             [
                 'name' => 'Посуда',
-                'generator_type' => 'cooldown',
                 'generator_name' => 'Гончарный круг',
                 'unlock_level' => 28,
                 'is_active' => true,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 2400,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 240,
                 'chain_config' => [],
             ]
         );

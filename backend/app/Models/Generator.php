@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Generator extends Model
 {
     protected $fillable = [
-        'user_id', 'theme_id', 'type', 'level',
+        'user_id', 'theme_id', 'level',
         'charges_left', 'max_charges', 'cooldown_until',
         'generation_limit', 'generation_timeout_seconds', 'energy_cost',
         'grid_x', 'grid_y',
@@ -38,15 +38,11 @@ class Generator extends Model
 
     public function isReady(): bool
     {
-        if ($this->type === 'chargeable') {
-            return $this->charges_left > 0;
-        }
-        return $this->cooldown_until === null || $this->cooldown_until->isPast();
+        return $this->charges_left > 0;
     }
 
     /**
-     * If cooldown_until is in the past, restore chargeable generators to max_charges
-     * or clear stale cooldown timestamps (so clients and isReady() stay consistent).
+     * If cooldown_until is in the past, restore charges and clear stale cooldown timestamps.
      */
     public function refreshCooldownIfExpired(): bool
     {
@@ -54,17 +50,11 @@ class Generator extends Model
             return false;
         }
 
-        if ($this->type === 'chargeable') {
-            $updates = ['cooldown_until' => null];
-            if ($this->charges_left <= 0) {
-                $updates['charges_left'] = $this->max_charges;
-            }
-            $this->update($updates);
-
-            return true;
+        $updates = ['cooldown_until' => null];
+        if ($this->charges_left <= 0) {
+            $updates['charges_left'] = $this->max_charges;
         }
-
-        $this->update(['cooldown_until' => null]);
+        $this->update($updates);
 
         return true;
     }

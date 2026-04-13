@@ -21,19 +21,9 @@
             <input type="text" name="slug" id="slug" value="{{ old('slug', $theme?->slug) }}" required class="input-block">
         </div>
 
-        <div class="grid-2">
-            <div class="form-group">
-                <label for="generator_type">Тип генератора</label>
-                <select name="generator_type" id="generator_type" class="input-block">
-                    <option value="chargeable" {{ old('generator_type', $theme?->generator_type) === 'chargeable' ? 'selected' : '' }}>Заряжаемый</option>
-                    <option value="cooldown" {{ old('generator_type', $theme?->generator_type) === 'cooldown' ? 'selected' : '' }}>Кулдаунный</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="generator_name">Название генератора</label>
-                <input type="text" name="generator_name" id="generator_name" value="{{ old('generator_name', $theme?->generator_name) }}" required class="input-block">
-            </div>
+        <div class="form-group">
+            <label for="generator_name">Название генератора</label>
+            <input type="text" name="generator_name" id="generator_name" value="{{ old('generator_name', $theme?->generator_name) }}" required class="input-block">
         </div>
 
         <div class="grid-4">

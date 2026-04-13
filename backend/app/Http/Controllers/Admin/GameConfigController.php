@@ -31,7 +31,6 @@ class GameConfigController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:themes,slug',
-            'generator_type' => 'required|in:chargeable,cooldown',
             'generator_name' => 'required|string|max:255',
             'unlock_level' => 'required|integer|min:1',
             'is_active' => 'boolean',
@@ -58,7 +57,6 @@ class GameConfigController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:themes,slug,' . $theme->id,
-            'generator_type' => 'required|in:chargeable,cooldown',
             'generator_name' => 'required|string|max:255',
             'unlock_level' => 'required|integer|min:1',
             'is_active' => 'boolean',

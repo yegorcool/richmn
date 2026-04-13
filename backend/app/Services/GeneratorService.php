@@ -52,18 +52,10 @@ class GeneratorService
             'grid_y' => $emptySlot['y'],
         ]);
 
-        if ($generator->type === 'chargeable') {
-            $generator->decrement('charges_left');
-            $limit = $generator->generation_limit ?: config('game.generator.default_limit', 5);
-            $timeout = $generator->generation_timeout_seconds ?: config('game.generator.default_timeout', 1800);
+        $generator->decrement('charges_left');
+        $timeout = $generator->generation_timeout_seconds ?: config('game.generator.default_timeout', 1800);
 
-            if ($generator->charges_left <= 0) {
-                $generator->update([
-                    'cooldown_until' => now()->addSeconds($timeout),
-                ]);
-            }
-        } else {
-            $timeout = $generator->generation_timeout_seconds ?: config('game.generator.default_timeout', 1800);
+        if ($generator->charges_left <= 0) {
             $generator->update([
                 'cooldown_until' => now()->addSeconds($timeout),
             ]);
@@ -113,7 +105,6 @@ class GeneratorService
         $newGenerator = Generator::create([
             'user_id' => $user->id,
             'theme_id' => $gen1->theme_id,
-            'type' => $gen1->type,
             'level' => $newLevel,
             'charges_left' => $limit + $newLevel,
             'max_charges' => $limit + $newLevel,

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Theme extends Model
 {
     protected $fillable = [
-        'name', 'slug', 'generator_type', 'generator_name',
+        'name', 'slug', 'generator_name',
         'unlock_level', 'chain_config', 'is_active',
         'generator_energy_cost', 'generator_generation_limit', 'generator_generation_timeout',
     ];

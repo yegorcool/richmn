@@ -13,12 +13,11 @@ class ThemeSeeder extends Seeder
             [
                 'name' => 'Кофейня',
                 'slug' => 'coffee',
-                'generator_type' => 'chargeable',
                 'generator_name' => 'Кофемашина',
                 'unlock_level' => 1,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 1800,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 180,
                 'chain_config' => [
                     ['level' => 1, 'name' => 'Зёрна', 'sprite_key' => 'coffee_1'],
                     ['level' => 2, 'name' => 'Молотый кофе', 'sprite_key' => 'coffee_2'],
@@ -35,12 +34,11 @@ class ThemeSeeder extends Seeder
             [
                 'name' => 'Выпечка',
                 'slug' => 'bakery',
-                'generator_type' => 'chargeable',
                 'generator_name' => 'Духовка',
                 'unlock_level' => 3,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 1800,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 360,
                 'chain_config' => [
                     ['level' => 1, 'name' => 'Мука', 'sprite_key' => 'bakery_1'],
                     ['level' => 2, 'name' => 'Тесто', 'sprite_key' => 'bakery_2'],
@@ -57,12 +55,11 @@ class ThemeSeeder extends Seeder
             [
                 'name' => 'Продукты',
                 'slug' => 'products',
-                'generator_type' => 'cooldown',
                 'generator_name' => 'Грядка',
                 'unlock_level' => 5,
                 'generator_energy_cost' => 1,
-                'generator_generation_limit' => 5,
-                'generator_generation_timeout' => 2400,
+                'generator_generation_limit' => 50,
+                'generator_generation_timeout' => 300,
                 'chain_config' => [
                     ['level' => 1, 'name' => 'Семена', 'sprite_key' => 'products_1'],
                     ['level' => 2, 'name' => 'Росток', 'sprite_key' => 'products_2'],

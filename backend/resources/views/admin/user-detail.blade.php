@@ -212,7 +212,7 @@
                                         </div>
                                     @endif
                                     @if($genCell)
-                                        <div class="user-field-entity user-field-entity--gen" title="{{ $genCell->definition_name ?? '' }} · {{ $genCell->type }}">
+                                        <div class="user-field-entity user-field-entity--gen" title="{{ $genCell->definition_name ?? '' }}">
                                             <span class="uf-badge">Ген.</span>
                                             <div class="uf-img">
                                                 @if($genCell->image_href)
@@ -222,12 +222,9 @@
                                                 @endif
                                             </div>
                                             <span class="uf-meta">
-                                                L{{ $genCell->level }}
-                                                @if($genCell->type === 'chargeable')
-                                                    · {{ $genCell->charges_left }}/{{ $genCell->max_charges }}
-                                                @endif
+                                                L{{ $genCell->level }} · {{ $genCell->charges_left }}/{{ $genCell->max_charges }}
                                             </span>
-                                            @if($genCell->type === 'cooldown' && $genCell->cooldown_until)
+                                            @if($genCell->cooldown_until && $genCell->cooldown_until->isFuture())
                                                 <span class="uf-title">{{ $genCell->cooldown_until->format('H:i') }}</span>
                                             @elseif($genCell->definition_name)
                                                 <span class="uf-title">{{ $genCell->definition_name }}</span>
@@ -289,7 +286,6 @@
                     <th>Y</th>
                     <th>Тема</th>
                     <th>Уровень</th>
-                    <th>Тип</th>
                     <th>Заряды / кулдаун</th>
                     <th>Название (цепочка)</th>
                     <th>ID</th>
@@ -311,12 +307,10 @@
                     <td>{{ $gen->grid_y }}</td>
                     <td>{{ $gen->theme?->name ?? $gen->theme?->slug ?? $gen->theme_id }}</td>
                     <td>{{ $gen->level }}</td>
-                    <td>{{ $gen->type }}</td>
                     <td>
-                        @if($gen->type === 'chargeable')
-                            {{ $gen->charges_left }}/{{ $gen->max_charges }}
-                        @else
-                            {{ $gen->cooldown_until ?? '—' }}
+                        {{ $gen->charges_left }}/{{ $gen->max_charges }}
+                        @if($gen->cooldown_until)
+                            · {{ $gen->cooldown_until }}
                         @endif
                     </td>
                     <td>{{ $gen->definition_name ?? '—' }}</td>
