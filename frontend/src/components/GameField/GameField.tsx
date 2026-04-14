@@ -74,14 +74,11 @@ export function GameField() {
     addItem, removeItems, updateItemPosition,
     replaceGenerator, updateGeneratorPosition,
     pendingMoves: pendingMovesRef, flushPendingMoves,
+    itemsRef, generatorsRef,
   } = useGame();
   const platform = usePlatform();
-  const itemsRef = useRef(items);
-  const generatorsRef = useRef(generators);
   const energyRef = useRef(energy);
 
-  useEffect(() => { itemsRef.current = items; }, [items]);
-  useEffect(() => { generatorsRef.current = generators; }, [generators]);
   useEffect(() => {
     if (!tapProcessingRef.current && tapQueueRef.current.length === 0) {
       energyRef.current = energy;
@@ -624,13 +621,15 @@ export function GameField() {
 
     // ── Drag & Drop ──
 
-    container.on('pointerdown', (_e: FederatedPointerEvent) => {
+    container.on('pointerdown', (e: FederatedPointerEvent) => {
       dragRef.current = {
         itemId: item.id,
         startX: container.x,
         startY: container.y,
         sprite: container,
       };
+      (container as any).__pointerStartX = e.global.x;
+      (container as any).__pointerStartY = e.global.y;
       container.alpha = 0.8;
       container.scale.set(1.1);
       container.zIndex = 1000;
@@ -652,6 +651,18 @@ export function GameField() {
       const drag = dragRef.current;
       dragRef.current = null;
 
+      const psx = (container as any).__pointerStartX ?? 0;
+      const psy = (container as any).__pointerStartY ?? 0;
+      const tapDist = Math.hypot(e.global.x - psx, e.global.y - psy);
+      if (tapDist < GENERATOR_DRAG_THRESHOLD_PX) {
+        const cur = itemsRef.current.find((i) => i.id === item.id);
+        if (cur) {
+          window.dispatchEvent(new CustomEvent('item-selected', {
+            detail: { name: cur.item_name ?? cur.theme_slug, level: cur.item_level },
+          }));
+        }
+      }
+
       container.alpha = 1;
       container.scale.set(1);
       container.zIndex = 0;
@@ -662,11 +673,16 @@ export function GameField() {
         return;
       }
 
+      const currentItem = itemsRef.current.find((i) => i.id === item.id);
+      if (!currentItem) {
+        return;
+      }
+
       const targetItem = itemsRef.current.find(
-        (i) => i.grid_x === gx && i.grid_y === gy && i.id !== item.id
+        (i) => i.grid_x === gx && i.grid_y === gy && i.id !== currentItem.id
       );
 
-      if (targetItem && targetItem.theme_slug === item.theme_slug && targetItem.item_level === item.item_level) {
+      if (targetItem && targetItem.theme_slug === currentItem.theme_slug && targetItem.item_level === currentItem.item_level) {
         const targetSprite = itemSpritesRef.current.get(targetItem.id);
         const targetPos = gridToPixel(gx, gy);
 
@@ -675,23 +691,23 @@ export function GameField() {
         }
 
         const tempId = -(Date.now() + Math.random());
-        const newLevel = item.item_level + 1;
+        const newLevel = currentItem.item_level + 1;
         const optimisticItem: GameItem = {
           id: tempId,
-          theme_id: item.theme_id,
-          theme_slug: item.theme_slug,
+          theme_id: currentItem.theme_id,
+          theme_slug: currentItem.theme_slug,
           item_level: newLevel,
           grid_x: gx,
           grid_y: gy,
-          image_url: item.image_url,
-          item_name: item.item_name,
+          image_url: currentItem.image_url,
+          item_name: currentItem.item_name,
         };
 
-        const savedItems = [{ ...item }, { ...targetItem }];
-        removeItems([item.id, targetItem.id]);
+        const savedItems = [{ ...currentItem }, { ...targetItem }];
+        removeItems([currentItem.id, targetItem.id]);
         addItem(optimisticItem);
 
-        gameApi.merge(item.id, targetItem.id).then((result) => {
+        gameApi.merge(currentItem.id, targetItem.id).then((result) => {
           removeItems([tempId]);
           addItem(result.new_item);
           energyRef.current = result.energy;
@@ -710,8 +726,8 @@ export function GameField() {
         container.x = drag.startX;
         container.y = drag.startY;
       } else {
-        updateItemPosition(item.id, gx, gy);
-        pendingMovesRef.current.push({ type: 'item', id: item.id, grid_x: gx, grid_y: gy });
+        updateItemPosition(currentItem.id, gx, gy);
+        pendingMovesRef.current.push({ type: 'item', id: currentItem.id, grid_x: gx, grid_y: gy });
         scheduleMoveFlush();
       }
     });

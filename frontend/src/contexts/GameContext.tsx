@@ -30,6 +30,8 @@ interface GameContextValue {
   updateGeneratorPosition: (id: number, gridX: number, gridY: number) => void;
   pendingMoves: React.MutableRefObject<PendingMove[]>;
   flushPendingMoves: () => void;
+  itemsRef: React.MutableRefObject<GameItem[]>;
+  generatorsRef: React.MutableRefObject<Generator[]>;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -37,8 +39,8 @@ const GameContext = createContext<GameContextValue | null>(null);
 export function GameProvider({ children }: { children: ReactNode }) {
   const platform = usePlatform();
   const [user, setUser] = useState<User | null>(null);
-  const [items, setItems] = useState<GameItem[]>([]);
-  const [generators, setGenerators] = useState<Generator[]>([]);
+  const [items, setItemsRaw] = useState<GameItem[]>([]);
+  const [generators, setGeneratorsRaw] = useState<Generator[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [energy, setEnergy] = useState(50);
@@ -46,6 +48,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const initializedRef = useRef(false);
   const pendingMovesRef = useRef<PendingMove[]>([]);
+  const itemsRef = useRef<GameItem[]>([]);
+  const generatorsRef = useRef<Generator[]>([]);
+
+  const setItems = useCallback((newItems: GameItem[]) => {
+    itemsRef.current = newItems;
+    setItemsRaw(newItems);
+  }, []);
+
+  const setGenerators = useCallback((newGens: Generator[]) => {
+    generatorsRef.current = newGens;
+    setGeneratorsRaw(newGens);
+  }, []);
 
   useEffect(() => {
     apiClient.init(platform.platform, platform.initData);
@@ -123,34 +137,39 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setOrders(res.orders);
   }, []);
 
-  // --- Granular optimistic updaters ---
+  // --- Granular optimistic updaters (eagerly sync refs for immediate reads) ---
 
   const addItem = useCallback((item: GameItem) => {
-    setItems((prev) => [...prev, item]);
+    itemsRef.current = [...itemsRef.current, item];
+    setItemsRaw((prev) => [...prev, item]);
   }, []);
 
   const removeItems = useCallback((ids: number[]) => {
     const idSet = new Set(ids);
-    setItems((prev) => prev.filter((i) => !idSet.has(i.id)));
+    itemsRef.current = itemsRef.current.filter((i) => !idSet.has(i.id));
+    setItemsRaw((prev) => prev.filter((i) => !idSet.has(i.id)));
   }, []);
 
   const updateItemPosition = useCallback((id: number, gridX: number, gridY: number) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, grid_x: gridX, grid_y: gridY } : i)));
+    itemsRef.current = itemsRef.current.map((i) => (i.id === id ? { ...i, grid_x: gridX, grid_y: gridY } : i));
+    setItemsRaw((prev) => prev.map((i) => (i.id === id ? { ...i, grid_x: gridX, grid_y: gridY } : i)));
   }, []);
 
   const replaceGenerator = useCallback((generator: Generator) => {
-    setGenerators((prev) =>
-      prev.map((g) => {
+    const update = (list: Generator[]) =>
+      list.map((g) => {
         if (g.id !== generator.id) return g;
-        // Tap/move responses often omit `theme`; keep prior relation so the field icon stays correct.
         const theme = generator.theme ?? g.theme;
         return theme ? { ...generator, theme } : generator;
-      }),
-    );
+      });
+    generatorsRef.current = update(generatorsRef.current);
+    setGeneratorsRaw(update);
   }, []);
 
   const updateGeneratorPosition = useCallback((id: number, gridX: number, gridY: number) => {
-    setGenerators((prev) => prev.map((g) => (g.id === id ? { ...g, grid_x: gridX, grid_y: gridY } : g)));
+    const update = (list: Generator[]) => list.map((g) => (g.id === id ? { ...g, grid_x: gridX, grid_y: gridY } : g));
+    generatorsRef.current = update(generatorsRef.current);
+    setGeneratorsRaw(update);
   }, []);
 
   // --- Background sync to correct any drift ---
@@ -188,6 +207,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       refreshState, refreshOrders, setItems, setEnergy, setUser,
       addItem, removeItems, updateItemPosition, replaceGenerator, updateGeneratorPosition,
       pendingMoves: pendingMovesRef, flushPendingMoves,
+      itemsRef, generatorsRef,
     }}>
       {children}
     </GameContext.Provider>

@@ -1,7 +1,7 @@
 .order-panel {
   display: flex;
-  gap: 8px;
-  padding: 8px 12px 0;
+  gap: 6px;
+  padding: 4px 12px 0;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -14,62 +14,62 @@
   width: 100%;
   text-align: center;
   color: #8A8A8A;
-  font-size: 14px;
-  padding: 12px;
+  font-size: 12px;
+  padding: 6px;
 }
 
 .order-card {
   flex-shrink: 0;
   background: white;
-  border-radius: 12px;
-  padding: 8px 10px;
-  min-width: 100px;
+  border-radius: 10px;
+  padding: 4px 8px;
+  min-width: 80px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .order-card__avatar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
 }
 
 .order-card__avatar-circle {
-  width: 36px;
-  height: 36px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: linear-gradient(135deg, #A8E6CF, #D4A5FF);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 10px;
   font-weight: 600;
   color: white;
 }
 
 .order-card__name {
-  font-size: 10px;
+  font-size: 8px;
   color: #8A8A8A;
   white-space: nowrap;
 }
 
 .order-card__items {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 
 .order-card__item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px;
+  padding: 2px 3px;
   background: #FFF5E6;
-  border-radius: 6px;
+  border-radius: 4px;
   position: relative;
-  min-width: 36px;
+  min-width: 28px;
 }
 
 .order-card__item--done {
@@ -77,11 +77,11 @@
 }
 
 .order-card__item-theme {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   color: #555;
   text-transform: capitalize;
-  max-width: 52px;
+  max-width: 44px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -89,7 +89,7 @@
 }
 
 .order-card__item-level {
-  font-size: 9px;
+  font-size: 8px;
   color: #666;
 }
 
@@ -97,19 +97,19 @@
   position: absolute;
   top: -2px;
   right: -2px;
-  font-size: 10px;
+  font-size: 8px;
   background: #4CAF50;
   color: white;
   border-radius: 50%;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .order-card__progress {
-  font-size: 11px;
+  font-size: 10px;
   color: #8A8A8A;
   font-weight: 500;
 }

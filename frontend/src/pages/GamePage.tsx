@@ -14,11 +14,21 @@ export function GamePage() {
   const { user, refreshState } = useGame();
   const { line, clearLine } = useCharacterBubble();
   const [showRefill, setShowRefill] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<{ name: string; level: number } | null>(null);
 
   useEffect(() => {
     const handler = () => setShowRefill(true);
     window.addEventListener('no-energy', handler);
     return () => window.removeEventListener('no-energy', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { name: string; level: number };
+      setSelectedItem(detail);
+    };
+    window.addEventListener('item-selected', handler);
+    return () => window.removeEventListener('item-selected', handler);
   }, []);
 
   const handleRefill = async (source: 'ad' | 'referral') => {
@@ -48,6 +58,17 @@ export function GamePage() {
         <Suspense fallback={<div className="game-page__field-loading">Загрузка поля…</div>}>
           <GameField />
         </Suspense>
+      </div>
+
+      <div className="game-page__item-info">
+        {selectedItem ? (
+          <>
+            <span className="game-page__item-info-name">{selectedItem.name}</span>
+            <span className="game-page__item-info-level">Lv.{selectedItem.level}</span>
+          </>
+        ) : (
+          <span className="game-page__item-info-hint">Нажмите на предмет</span>
+        )}
       </div>
 
       {showRefill && (
