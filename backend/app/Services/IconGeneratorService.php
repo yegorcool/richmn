@@ -89,10 +89,10 @@ class IconGeneratorService
             "A single game icon of a merge-2 generator machine: \"{$generatorName}\".",
             "Theme collection: {$themeName}.",
             'Looks like a playful appliance or station that produces items, not a single product.',
-            "Theme signature color (must dominate): {$accent}",
-            'Small secondary accents may use one contrasting candy color; high chroma;',
-            'no brown, sepia, or dull earth tones.',
-            'Glossy enamel or plastic finish, strong specular highlights, jewel shine, subtle glow,',
+            "Theme signature color — use as a strong accent, not a flat recolor of everything: {$accent}",
+            'It may dominate large panels, lights, trim, or energy effects, or stay as the main vivid accent alongside believable materials (metal, glass, wood, coffee tones) when those fit the theme.',
+            'High chroma where it helps readability; avoid muddy gray mush overall.',
+            'Glossy enamel or plastic where appropriate, strong specular highlights, jewel shine on accents, subtle glow,',
             'juicy polished mobile-game look.',
             'Match reference images for outline weight, soft 3D form, and cartoon proportions only.',
             'Single centered object, no text, no letters, no background elements.',
@@ -176,9 +176,9 @@ class IconGeneratorService
         $accent = Theme::accentColorPromptFragment($accentColorKey);
 
         $levelDescription = match (true) {
-            $level <= 3 => 'Simple, small, crisp silhouette with punchy color.',
+            $level <= 3 => 'Simple, small, crisp silhouette; clear readable colors.',
             $level <= 6 => 'Moderately detailed, richer hues and cleaner shapes.',
-            $level <= 9 => 'Elaborate, richly detailed, rainbow-bright accents and contrast.',
+            $level <= 9 => 'Elaborate, richly detailed, vivid accents and contrast where appropriate.',
             default => 'Premium showpiece: prismatic highlights, extra gloss, starry sparkle hints.',
         };
 
@@ -186,10 +186,11 @@ class IconGeneratorService
             "A single game icon of \"{$itemName}\" for a colorful merge-2 mobile game.",
             "{$themeName} collection, level {$level} of 10.",
             $levelDescription,
-            "Theme signature color (must dominate the icon): {$accent}",
-            'Secondary details may use one small contrasting candy accent for pop;',
-            'saturated and cheerful; no brown, sepia, or muddy neutrals.',
-            'Glossy surfaces, bright specular hits, soft inner glow, jewel-like shine,',
+            'Keep the subject\'s natural, recognizable colors when realism matters — e.g. coffee beans stay brown, bread stays golden, leaves stay green; do not dye the whole object into the theme hue if that would look wrong.',
+            "Theme signature color — optional tie-in, not a forced recolor: {$accent}",
+            'Use it as the main vivid accent (rim glow, glaze, particles, trim, dishware, packaging stripe) or let it dominate only on parts where it still reads as that object.',
+            'Cheerful saturation overall; avoid dull muddy gray-only palettes.',
+            'Glossy surfaces, bright specular hits, soft inner glow, jewel-like shine where it fits the material,',
             'juicy polished casual-game rendering.',
             'Match reference images for thick dark outlines, soft 3D shading, and cartoon proportions only.',
             'Single centered object, no text, no letters, no background elements.',

@@ -12,42 +12,42 @@ class Theme extends Model
         'hot_pink' => [
             'label' => 'Розовый',
             'hex' => '#ff4d9d',
-            'prompt' => 'Primary hue: saturated hot pink and magenta — the main mass (body, casing, or glow) must read clearly as pink, not neutral or brown.',
+            'prompt' => 'Accent hue: saturated hot pink and magenta — use for glow, trim, glaze, particles, or supporting props; do not recolor brown or natural subjects (e.g. beans, wood) into pink.',
         ],
         'lime_green' => [
             'label' => 'Зелёный',
             'hex' => '#6ee755',
-            'prompt' => 'Primary hue: vivid lime and spring green — green dominates the silhouette so this theme reads as green.',
+            'prompt' => 'Accent hue: vivid lime and spring green — for highlights, energy, or accents; keep plants/food their natural greens where that reads better.',
         ],
         'sky_blue' => [
             'label' => 'Голубой',
             'hex' => '#38b6ff',
-            'prompt' => 'Primary hue: bright sky blue and azure — cool blue dominates the object.',
+            'prompt' => 'Accent hue: bright sky blue and azure — for glass shine, vapor, trim, or magical sparkle; water and sky may stay naturally blue without forcing the whole icon monochrome.',
         ],
         'sunny_yellow' => [
             'label' => 'Жёлтый',
             'hex' => '#ffe135',
-            'prompt' => 'Primary hue: clean sunny yellow and lemon — bright yellow dominates; avoid ochre or brown-yellow.',
+            'prompt' => 'Accent hue: clean sunny yellow and lemon — for cheerful highlights or packaging pops; golden baked goods can stay warm golden, not dyed neon yellow.',
         ],
         'orange' => [
             'label' => 'Оранжевый',
             'hex' => '#ff8c32',
-            'prompt' => 'Primary hue: bold orange and tangerine — citrus orange dominates, not brown.',
+            'prompt' => 'Accent hue: bold orange and tangerine — for citrus zest, trim, or glow; brown foods (coffee, chocolate, crust) keep believable browns.',
         ],
         'violet' => [
             'label' => 'Фиолетовый',
             'hex' => '#a855f7',
-            'prompt' => 'Primary hue: rich violet and purple — purple clearly identifies this theme.',
+            'prompt' => 'Accent hue: rich violet and purple — for magical sheen, berries, or decorative accents; other fruits and subjects keep natural hues.',
         ],
         'cyan' => [
             'label' => 'Бирюзовый',
             'hex' => '#22d3ee',
-            'prompt' => 'Primary hue: electric cyan and aqua — turquoise-cyan dominates.',
+            'prompt' => 'Accent hue: electric cyan and aqua — for water sparkle, ice edges, tech glow, or trim; do not wash out every material into flat cyan.',
         ],
         'magenta' => [
             'label' => 'Пурпурный',
             'hex' => '#e879f9',
-            'prompt' => 'Primary hue: electric magenta and fuchsia — vivid purple-pink dominates.',
+            'prompt' => 'Accent hue: electric magenta and fuchsia — for vivid highlights or fantasy accents; the main product stays recognizable and naturally colored when needed.',
         ],
     ];
 
