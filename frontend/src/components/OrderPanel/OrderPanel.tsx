@@ -36,7 +36,9 @@ function OrderCard({ order }: { order: Order }) {
             key={i}
             className={`order-card__item ${req.fulfilled ? 'order-card__item--done' : ''}`}
           >
-            <span className="order-card__item-emoji">{getThemeEmoji(req.theme_slug)}</span>
+            <span className="order-card__item-theme" title={req.theme_slug}>
+              {req.theme_slug}
+            </span>
             <span className="order-card__item-level">Lv{req.item_level}</span>
             {req.fulfilled && <span className="order-card__check">✓</span>}
           </div>
@@ -47,12 +49,4 @@ function OrderCard({ order }: { order: Order }) {
       </div>
     </div>
   );
-}
-
-function getThemeEmoji(slug: string): string {
-  const map: Record<string, string> = {
-    coffee: '☕', bakery: '🧁', products: '🥗',
-    sweets: '🍬', flowers: '🌸', tools: '🔧',
-  };
-  return map[slug] ?? '📦';
 }

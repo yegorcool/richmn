@@ -60,7 +60,6 @@ export function GameField() {
   const tapQueueRef = useRef<{ generatorId: number; tempId: number; cellKey: string }[]>([]);
   const tapProcessingRef = useRef(false);
   const tapFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const animatingItemIdsRef = useRef<Set<number>>(new Set());
   const reservedCellsRef = useRef<Set<string>>(new Set());
   const moveFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generatorTooltipDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -267,57 +266,6 @@ export function GameField() {
 
       app.ticker.add(tick);
     });
-  };
-
-  const playOverlaySpawnAnimation = (
-    imageUrl: string | null | undefined,
-    themeSlug: string | undefined,
-    fromX: number,
-    fromY: number,
-    toX: number,
-    toY: number,
-    onLanded?: () => void,
-  ) => {
-    const layer = animLayerRef.current;
-    if (!layer) { onLanded?.(); return; }
-
-    const temp = new Container();
-    temp.x = fromX;
-    temp.y = fromY;
-    temp.scale.set(0);
-
-    const emoji = new Text({
-      text: getThemeEmoji(themeSlug ?? ''),
-      style: new TextStyle({ fontSize: Math.round(CELL_SIZE * 0.55) }),
-    });
-    emoji.anchor.set(0.5);
-    temp.addChild(emoji);
-
-    if (imageUrl) {
-      const iconSize = CELL_SIZE;
-      loadItemTexture(imageUrl, iconSize).then((texture) => {
-        if (texture && !temp.destroyed) {
-          const sprite = new Sprite(texture);
-          sprite.width = iconSize;
-          sprite.height = iconSize;
-          sprite.anchor.set(0.5);
-          sprite.roundPixels = true;
-          temp.removeChild(emoji);
-          emoji.destroy();
-          temp.addChild(sprite);
-        }
-      });
-    }
-
-    layer.addChild(temp);
-
-    animateTween(temp, { scaleX: 1.25, scaleY: 1.25 }, 150, easeOutBack)
-      .then(() => animateTween(temp, { scaleX: 1, scaleY: 1, x: toX, y: toY }, 150, easeOutQuad))
-      .then(() => {
-        spawnParticles(fromX, fromY, 0x98D8C8);
-        onLanded?.();
-        temp.destroy();
-      });
   };
 
   const playMergeAnimation = async (
@@ -602,22 +550,7 @@ export function GameField() {
       item_name: null,
     };
 
-    animatingItemIdsRef.current.add(tempId);
     addItem(optimisticItem);
-
-    const genPos = gridToPixel(gen.grid_x, gen.grid_y);
-    const itemPos = gridToPixel(slot.x, slot.y);
-    playOverlaySpawnAnimation(
-      null,
-      themeSlug,
-      genPos.x, genPos.y,
-      itemPos.x, itemPos.y,
-      () => {
-        animatingItemIdsRef.current.delete(tempId);
-        const s = itemSpritesRef.current.get(tempId);
-        if (s) s.alpha = 1;
-      },
-    );
 
     tapQueueRef.current.push({ generatorId, tempId, cellKey });
     scheduleTapFlush();
@@ -667,10 +600,6 @@ export function GameField() {
     container.eventMode = 'static';
     container.cursor = 'pointer';
 
-    if (animatingItemIdsRef.current.has(item.id)) {
-      container.alpha = 0;
-    }
-
     const iconSize = CELL_SIZE;
 
     if (item.image_url) {
@@ -684,13 +613,6 @@ export function GameField() {
           container.addChildAt(sprite, 0);
         }
       });
-    } else {
-      const themeIcon = new Text({
-        text: getThemeEmoji(item.theme_slug),
-        style: new TextStyle({ fontSize: Math.round(CELL_SIZE * 0.55) }),
-      });
-      themeIcon.anchor.set(0.5);
-      container.addChild(themeIcon);
     }
 
     if (item.item_level >= 8) {
@@ -745,8 +667,6 @@ export function GameField() {
       );
 
       if (targetItem && targetItem.theme_slug === item.theme_slug && targetItem.item_level === item.item_level) {
-        platform.hapticFeedback('impact');
-
         const targetSprite = itemSpritesRef.current.get(targetItem.id);
         const targetPos = gridToPixel(gx, gy);
 
@@ -829,15 +749,6 @@ export function GameField() {
 
     const iconSize = CELL_SIZE;
 
-    const addEmojiIcon = () => {
-      const icon = new Text({
-        text: getThemeEmoji(slug ?? ''),
-        style: new TextStyle({ fontSize: Math.round(CELL_SIZE * 0.5) }),
-      });
-      icon.anchor.set(0.5);
-      container.addChildAt(icon, 0);
-    };
-
     if (imageUrl) {
       loadItemTexture(imageUrl, iconSize).then((texture) => {
         if (container.destroyed) return;
@@ -848,12 +759,8 @@ export function GameField() {
           sprite.anchor.set(0.5);
           sprite.roundPixels = true;
           container.addChildAt(sprite, 0);
-        } else {
-          addEmojiIcon();
         }
       });
-    } else {
-      addEmojiIcon();
     }
 
     const finishGeneratorPointer = async (e: FederatedPointerEvent, releasedOutside: boolean) => {
@@ -1058,8 +965,6 @@ function easeInQuad(t: number): number {
   return t * t;
 }
 
-// ── Theme Emoji Map ───────────────────────────────────────
-
 /** Thematic generator art (Iconify SVG), aligned with item icons in ItemDefinitionSeeder. */
 function getGeneratorImageUrl(slug: string): string | null {
   const map: Record<string, string> = {
@@ -1070,20 +975,4 @@ function getGeneratorImageUrl(slug: string): string | null {
     pottery: 'https://api.iconify.design/twemoji/amphora.svg',
   };
   return map[slug] ?? null;
-}
-
-function getThemeEmoji(slug: string): string {
-  const map: Record<string, string> = {
-    coffee: '☕',
-    bakery: '🧁',
-    products: '🥗',
-    sweets: '🍬',
-    flowers: '🌸',
-    tools: '🔧',
-    cosmetics: '💄',
-    spices: '🌶️',
-    fabrics: '🧵',
-    pottery: '🏺',
-  };
-  return map[slug] ?? '📦';
 }

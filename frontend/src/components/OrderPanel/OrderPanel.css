@@ -76,8 +76,16 @@
   background: #A8E6CF;
 }
 
-.order-card__item-emoji {
-  font-size: 16px;
+.order-card__item-theme {
+  font-size: 9px;
+  font-weight: 600;
+  color: #555;
+  text-transform: capitalize;
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .order-card__item-level {
