@@ -21,6 +21,12 @@ class RegenerateIconsOpenAI extends Command
 
     public function handle(IconGeneratorService $iconGenerator): int
     {
+        if (empty(config('openai.api_key', ''))) {
+            $this->error('Не задан OPENAI_API_KEY (или config/openai.php).');
+
+            return self::FAILURE;
+        }
+
         $withoutItems = (bool) $this->option('without-items');
         $withoutGenerators = (bool) $this->option('without-generators');
 
