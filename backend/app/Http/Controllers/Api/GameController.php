@@ -140,6 +140,62 @@ class GameController extends Controller
         return response()->json($result);
     }
 
+    public function tapGeneratorBatch(Request $request, GeneratorService $generators): JsonResponse
+    {
+        $user = $this->user($request);
+        $validated = $request->validate([
+            'generator_id' => 'required|integer',
+            'count' => 'required|integer|min:1|max:20',
+        ]);
+
+        $result = $generators->tapBatch($user, $validated['generator_id'], $validated['count']);
+
+        if (!$result['success']) {
+            if ($result['error'] === 'Not enough energy') {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error'],
+                ], 403);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'],
+                'cooldown_until' => $result['cooldown_until'] ?? null,
+            ]);
+        }
+
+        return response()->json($result);
+    }
+
+    public function moveBatch(Request $request): JsonResponse
+    {
+        $user = $this->user($request);
+        $validated = $request->validate([
+            'moves' => 'required|array|max:20',
+            'moves.*.type' => 'required|in:item,generator',
+            'moves.*.id' => 'required|integer',
+            'moves.*.grid_x' => 'required|integer|min:0|max:5',
+            'moves.*.grid_y' => 'required|integer|min:0|max:7',
+        ]);
+
+        foreach ($validated['moves'] as $move) {
+            if ($move['type'] === 'item') {
+                $item = Item::where('user_id', $user->id)->find($move['id']);
+                if ($item) {
+                    $item->update(['grid_x' => $move['grid_x'], 'grid_y' => $move['grid_y']]);
+                }
+            } else {
+                $generator = Generator::where('user_id', $user->id)->find($move['id']);
+                if ($generator) {
+                    $generator->update(['grid_x' => $move['grid_x'], 'grid_y' => $move['grid_y']]);
+                }
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     public function moveItem(Request $request): JsonResponse
     {
         $user = $this->user($request);

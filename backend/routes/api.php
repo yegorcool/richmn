@@ -26,8 +26,10 @@ Route::middleware('miniapp')->group(function () {
     Route::get('/game/state', [GameController::class, 'state']);
     Route::post('/game/merge', [GameController::class, 'merge']);
     Route::post('/game/generator/tap', [GameController::class, 'tapGenerator']);
+    Route::post('/game/generator/tap-batch', [GameController::class, 'tapGeneratorBatch']);
     Route::post('/game/move-item', [GameController::class, 'moveItem']);
     Route::post('/game/move-generator', [GameController::class, 'moveGenerator']);
+    Route::post('/game/move-batch', [GameController::class, 'moveBatch']);
 
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders/{order}/submit', [OrderController::class, 'submit']);

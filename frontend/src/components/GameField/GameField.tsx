@@ -71,7 +71,9 @@ export function GameField() {
   const animLayerRef = useRef<Container | null>(null);
   const tapQueueRef = useRef<number[]>([]);
   const tapProcessingRef = useRef(false);
+  const tapFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animatingItemIdsRef = useRef<Set<number>>(new Set());
+  const moveFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generatorTooltipDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [generatorTooltip, setGeneratorTooltip] = useState<{
     message: string;
@@ -83,6 +85,7 @@ export function GameField() {
     items, generators, energy, setEnergy,
     addItem, removeItems, updateItemPosition,
     replaceGenerator, updateGeneratorPosition,
+    refreshState, pendingMoves: pendingMovesRef, flushPendingMoves,
   } = useGame();
   const platform = usePlatform();
   const itemsRef = useRef(items);
@@ -156,6 +159,14 @@ export function GameField() {
       cancelled = true;
       setAppReady(false);
       animLayerRef.current = null;
+      if (moveFlushTimerRef.current) {
+        clearTimeout(moveFlushTimerRef.current);
+        moveFlushTimerRef.current = null;
+      }
+      if (tapFlushTimerRef.current) {
+        clearTimeout(tapFlushTimerRef.current);
+        tapFlushTimerRef.current = null;
+      }
       if (generatorTooltipDismissRef.current) {
         clearTimeout(generatorTooltipDismissRef.current);
         generatorTooltipDismissRef.current = null;
@@ -393,6 +404,18 @@ export function GameField() {
     container.x = origX;
   };
 
+  // ── Move Batching ───────────────────────────────────────
+
+  const flushMoves = useCallback(() => {
+    moveFlushTimerRef.current = null;
+    flushPendingMoves();
+  }, [flushPendingMoves]);
+
+  const scheduleMoveFlush = useCallback(() => {
+    if (moveFlushTimerRef.current) return;
+    moveFlushTimerRef.current = setTimeout(flushMoves, 250);
+  }, [flushMoves]);
+
   // ── Tap Queue ────────────────────────────────────────────
 
   const showGeneratorNotReadyTooltip = (generatorId: number, cooldownUntil: string | null | undefined) => {
@@ -421,18 +444,26 @@ export function GameField() {
     }, 4000);
   };
 
-  const processTapQueue = async () => {
-    if (tapProcessingRef.current) return;
+  const TAP_BATCH_DELAY_MS = 80;
+
+  const flushTapQueue = async () => {
+    tapFlushTimerRef.current = null;
+    if (tapProcessingRef.current || tapQueueRef.current.length === 0) return;
     tapProcessingRef.current = true;
 
-    while (tapQueueRef.current.length > 0) {
-      const generatorId = tapQueueRef.current.shift()!;
+    const batch = tapQueueRef.current.splice(0);
+    const grouped = new Map<number, number>();
+    for (const gid of batch) {
+      grouped.set(gid, (grouped.get(gid) ?? 0) + 1);
+    }
 
+    for (const [generatorId, count] of grouped) {
       try {
-        const result = await gameApi.tapGenerator(generatorId);
+        const result = await gameApi.tapGeneratorBatch(generatorId, count);
 
         if (!result.success) {
-          const restoreCount = tapQueueRef.current.length + 1;
+          const remaining = tapQueueRef.current.length;
+          const restoreCount = remaining + count;
           energyRef.current += restoreCount;
           setEnergy(energyRef.current);
           tapQueueRef.current.length = 0;
@@ -445,44 +476,44 @@ export function GameField() {
 
           if (result.error === 'Generator not ready') {
             showGeneratorNotReadyTooltip(generatorId, result.cooldown_until);
-          } else if (result.error === 'No empty slots') {
-            // field is full, nothing else to do
           }
           break;
         }
 
         if (result.generator) replaceGenerator(result.generator);
 
-        const itemId = result.item.id;
-        animatingItemIdsRef.current.add(itemId);
-        addItem(result.item);
+        for (const spawnedItem of result.items) {
+          const itemId = spawnedItem.id;
+          animatingItemIdsRef.current.add(itemId);
+          addItem(spawnedItem);
+
+          const gen = generatorsRef.current.find((g) => g.id === generatorId);
+          const genPos = gen ? gridToPixel(gen.grid_x, gen.grid_y) : gridToPixel(0, 0);
+          const itemPos = gridToPixel(spawnedItem.grid_x, spawnedItem.grid_y);
+
+          playOverlaySpawnAnimation(
+            spawnedItem.theme_id,
+            spawnedItem.image_url,
+            spawnedItem.theme_slug,
+            genPos.x, genPos.y,
+            itemPos.x, itemPos.y,
+            () => {
+              animatingItemIdsRef.current.delete(itemId);
+              const sprite = itemSpritesRef.current.get(itemId);
+              if (sprite) sprite.alpha = 1;
+            },
+          );
+        }
 
         const pending = tapQueueRef.current.length;
         energyRef.current = result.energy - pending;
         setEnergy(energyRef.current);
-
-        const gen = generatorsRef.current.find((g) => g.id === generatorId);
-        const genPos = gen ? gridToPixel(gen.grid_x, gen.grid_y) : gridToPixel(0, 0);
-        const itemPos = gridToPixel(result.item.grid_x, result.item.grid_y);
-
-        playOverlaySpawnAnimation(
-          result.item.theme_id,
-          result.item.image_url,
-          result.item.theme_slug,
-          genPos.x, genPos.y,
-          itemPos.x, itemPos.y,
-          () => {
-            animatingItemIdsRef.current.delete(itemId);
-            const sprite = itemSpritesRef.current.get(itemId);
-            if (sprite) sprite.alpha = 1;
-          },
-        );
       } catch (err: unknown) {
         const is403 =
           err && typeof err === 'object' && 'response' in err &&
           (err as { response?: { status?: number } }).response?.status === 403;
 
-        const restoreCount = tapQueueRef.current.length + 1;
+        const restoreCount = tapQueueRef.current.length + count;
         energyRef.current += restoreCount;
         setEnergy(energyRef.current);
         tapQueueRef.current.length = 0;
@@ -493,13 +524,22 @@ export function GameField() {
           if (sprite) shakeSprite(sprite);
           window.dispatchEvent(new CustomEvent('no-energy'));
         } else {
-          console.error('Generator tap failed', err);
+          console.error('Generator tap batch failed', err);
         }
         break;
       }
     }
 
     tapProcessingRef.current = false;
+
+    if (tapQueueRef.current.length > 0) {
+      flushTapQueue();
+    }
+  };
+
+  const scheduleTapFlush = () => {
+    if (tapFlushTimerRef.current) return;
+    tapFlushTimerRef.current = setTimeout(flushTapQueue, TAP_BATCH_DELAY_MS);
   };
 
   const enqueueGeneratorTap = (generatorId: number) => {
@@ -516,7 +556,7 @@ export function GameField() {
     platform.hapticFeedback('selection');
 
     tapQueueRef.current.push(generatorId);
-    processTapQueue();
+    scheduleTapFlush();
   };
 
   // ── Render ────────────────────────────────────────────────
@@ -621,7 +661,7 @@ export function GameField() {
       }
     });
 
-    container.on('pointerup', async (e: FederatedPointerEvent) => {
+    container.on('pointerup', (e: FederatedPointerEvent) => {
       if (!dragRef.current || dragRef.current.itemId !== item.id || !container.parent) return;
 
       const pos = e.getLocalPosition(container.parent);
@@ -644,35 +684,56 @@ export function GameField() {
       );
 
       if (targetItem && targetItem.theme_slug === item.theme_slug && targetItem.item_level === item.item_level) {
-        try {
-          platform.hapticFeedback('impact');
+        platform.hapticFeedback('impact');
 
-          const targetSprite = itemSpritesRef.current.get(targetItem.id);
-          const targetPos = gridToPixel(gx, gy);
+        const targetSprite = itemSpritesRef.current.get(targetItem.id);
+        const targetPos = gridToPixel(gx, gy);
 
-          if (targetSprite) {
-            await playMergeAnimation(container, targetSprite, targetPos.x, targetPos.y);
-          }
+        if (targetSprite) {
+          playMergeAnimation(container, targetSprite, targetPos.x, targetPos.y);
+        }
 
-          const result = await gameApi.merge(item.id, targetItem.id);
-          setEnergy(result.energy);
-          removeItems([item.id, targetItem.id]);
+        const tempId = -(Date.now() + Math.random());
+        const newLevel = item.item_level + 1;
+        const optimisticItem: GameItem = {
+          id: tempId,
+          theme_id: item.theme_id,
+          theme_slug: item.theme_slug,
+          item_level: newLevel,
+          grid_x: gx,
+          grid_y: gy,
+          image_url: item.image_url,
+          item_name: item.item_name,
+        };
+
+        const savedItems = [{ ...item }, { ...targetItem }];
+        const prevEnergy = energyRef.current;
+        energyRef.current = Math.max(0, energyRef.current - 1);
+        setEnergy(energyRef.current);
+        removeItems([item.id, targetItem.id]);
+        addItem(optimisticItem);
+
+        gameApi.merge(item.id, targetItem.id).then((result) => {
+          removeItems([tempId]);
           addItem(result.new_item);
+          energyRef.current = result.energy;
+          setEnergy(result.energy);
 
           playChainCombo(targetPos.x, targetPos.y, result.chain_length);
 
           if (result.character_line) {
             window.dispatchEvent(new CustomEvent('character-line', { detail: result.character_line }));
           }
-        } catch {
-          container.x = drag.startX;
-          container.y = drag.startY;
-        }
+        }).catch(() => {
+          removeItems([tempId]);
+          savedItems.forEach((si) => addItem(si));
+          energyRef.current = prevEnergy;
+          setEnergy(prevEnergy);
+        });
       } else {
         updateItemPosition(item.id, gx, gy);
-        gameApi.moveItem(item.id, gx, gy).catch(() => {
-          updateItemPosition(item.id, pixelToGrid(drag.startX, drag.startY).gx, pixelToGrid(drag.startX, drag.startY).gy);
-        });
+        pendingMovesRef.current.push({ type: 'item', id: item.id, grid_x: gx, grid_y: gy });
+        scheduleMoveFlush();
       }
     });
 
@@ -774,9 +835,8 @@ export function GameField() {
         }
 
         updateGeneratorPosition(gen.id, gx, gy);
-        gameApi.moveGenerator(gen.id, gx, gy).catch(() => {
-          updateGeneratorPosition(gen.id, ptr.startGridX, ptr.startGridY);
-        });
+        pendingMovesRef.current.push({ type: 'generator', id: gen.id, grid_x: gx, grid_y: gy });
+        scheduleMoveFlush();
         return;
       }
 

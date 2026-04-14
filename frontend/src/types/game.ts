@@ -75,6 +75,21 @@ export type TapGeneratorResult =
       cooldown_until?: string | null;
     };
 
+export type TapGeneratorBatchResult =
+  | {
+      success: true;
+      items: GameItem[];
+      generator: Generator;
+      energy: number;
+      energy_max: number;
+      tapped: number;
+    }
+  | {
+      success: false;
+      error: string;
+      cooldown_until?: string | null;
+    };
+
 export interface Order {
   id: number;
   character_id: number;

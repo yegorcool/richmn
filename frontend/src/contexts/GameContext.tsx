@@ -7,6 +7,8 @@ import { usePlatform } from './PlatformContext';
 
 const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 
+type PendingMove = { type: 'item' | 'generator'; id: number; grid_x: number; grid_y: number };
+
 interface GameContextValue {
   user: User | null;
   items: GameItem[];
@@ -26,6 +28,8 @@ interface GameContextValue {
   updateItemPosition: (id: number, gridX: number, gridY: number) => void;
   replaceGenerator: (generator: Generator) => void;
   updateGeneratorPosition: (id: number, gridX: number, gridY: number) => void;
+  pendingMoves: React.MutableRefObject<PendingMove[]>;
+  flushPendingMoves: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -41,6 +45,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [energyMax, setEnergyMax] = useState(50);
   const [loading, setLoading] = useState(true);
   const initializedRef = useRef(false);
+  const pendingMovesRef = useRef<PendingMove[]>([]);
 
   useEffect(() => {
     apiClient.init(platform.platform, platform.initData);
@@ -98,13 +103,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const flushPendingMoves = useCallback(() => {
+    const batch = pendingMovesRef.current.splice(0);
+    if (batch.length === 0) return;
+    gameApi.moveBatch(batch).catch(() => {});
+  }, []);
+
   const refreshState = useCallback(async () => {
+    flushPendingMoves();
     const state = await gameApi.getGameState();
     setItems(state.items);
     setGenerators(state.generators);
     setEnergy(state.energy);
     setEnergyMax(state.energy_max);
-  }, []);
+  }, [flushPendingMoves]);
 
   const refreshOrders = useCallback(async () => {
     const res = await gameApi.getOrders();
@@ -143,12 +155,32 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, [refreshState]);
 
+  // --- Flush pending moves on visibility change / beforeunload ---
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingMoves();
+      }
+    };
+    const onBeforeUnload = () => {
+      flushPendingMoves();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [flushPendingMoves]);
+
   return (
     <GameContext.Provider value={{
       user, items, generators, orders, characters,
       energy, energyMax, loading,
       refreshState, refreshOrders, setItems, setEnergy, setUser,
       addItem, removeItems, updateItemPosition, replaceGenerator, updateGeneratorPosition,
+      pendingMoves: pendingMovesRef, flushPendingMoves,
     }}>
       {children}
     </GameContext.Provider>

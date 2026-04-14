@@ -2,7 +2,7 @@ import { apiClient } from './ApiClient';
 import type {
   User, GameState, Order, Character, CharacterLine,
   MergeResult, Chest, DecorLocation, EventInfo, StreakInfo,
-  DailyChallenge, Theme, TapGeneratorResult,
+  DailyChallenge, Theme, TapGeneratorResult, TapGeneratorBatchResult,
 } from '@/types/game';
 
 export const gameApi = {
@@ -16,6 +16,9 @@ export const gameApi = {
   tapGenerator: (generatorId: number) =>
     apiClient.post<TapGeneratorResult>('/game/generator/tap', { generator_id: generatorId }),
 
+  tapGeneratorBatch: (generatorId: number, count: number) =>
+    apiClient.post<TapGeneratorBatchResult>('/game/generator/tap-batch', { generator_id: generatorId, count }),
+
   moveItem: (itemId: number, gridX: number, gridY: number) =>
     apiClient.post<{ success: boolean }>('/game/move-item', { item_id: itemId, grid_x: gridX, grid_y: gridY }),
 
@@ -25,6 +28,9 @@ export const gameApi = {
       grid_x: gridX,
       grid_y: gridY,
     }),
+
+  moveBatch: (moves: { type: 'item' | 'generator'; id: number; grid_x: number; grid_y: number }[]) =>
+    apiClient.post<{ success: boolean }>('/game/move-batch', { moves }),
 
   getOrders: () => apiClient.get<{ orders: Order[] }>('/orders'),
 

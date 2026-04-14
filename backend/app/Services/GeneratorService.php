@@ -6,12 +6,92 @@ use App\Models\Generator;
 use App\Models\Item;
 use App\Models\ItemDefinition;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 class GeneratorService
 {
     public function __construct(
         private EnergyService $energyService,
     ) {}
+
+    public function tapBatch(User $user, int $generatorId, int $count): array
+    {
+        $count = min(max($count, 1), 20);
+
+        $generator = Generator::where('user_id', $user->id)->find($generatorId);
+        if (!$generator) {
+            return ['success' => false, 'error' => 'Generator not found'];
+        }
+
+        $generator->refreshCooldownIfExpired();
+
+        if (!$generator->isReady()) {
+            return [
+                'success' => false,
+                'error' => 'Generator not ready',
+                'cooldown_until' => $generator->cooldown_until,
+            ];
+        }
+
+        $energyCost = $generator->energy_cost ?: config('game.generator.default_energy_cost', 1);
+        $currentEnergy = $this->energyService->getCurrentEnergy($user);
+        if ($currentEnergy < $energyCost) {
+            return ['success' => false, 'error' => 'Not enough energy'];
+        }
+
+        $maxTaps = min($count, intdiv($currentEnergy, $energyCost), $generator->charges_left);
+        if ($maxTaps <= 0) {
+            return ['success' => false, 'error' => 'Not enough energy'];
+        }
+
+        $items = [];
+
+        DB::transaction(function () use ($user, $generator, $maxTaps, $energyCost, &$items) {
+            $totalEnergyCost = $maxTaps * $energyCost;
+            $this->energyService->spendEnergy($user, $totalEnergyCost, 'generator');
+
+            for ($i = 0; $i < $maxTaps; $i++) {
+                $emptySlot = $this->findEmptySlot($user, $generator);
+                if (!$emptySlot) break;
+
+                $spawnLevel = $this->getSpawnLevel($generator);
+                $item = Item::create([
+                    'user_id' => $user->id,
+                    'theme_id' => $generator->theme_id,
+                    'item_level' => $spawnLevel,
+                    'grid_x' => $emptySlot['x'],
+                    'grid_y' => $emptySlot['y'],
+                ]);
+
+                $itemDef = ItemDefinition::where('theme_id', $generator->theme_id)
+                    ->where('level', $spawnLevel)
+                    ->first();
+
+                $item->load('theme');
+                $itemData = $item->toArray();
+                $itemData['theme_slug'] = $item->theme?->slug;
+                $itemData['image_url'] = $itemDef?->image_path;
+                $itemData['item_name'] = $itemDef?->name;
+                $items[] = $itemData;
+
+                $generator->decrement('charges_left');
+                if ($generator->charges_left <= 0) {
+                    $timeout = $generator->generation_timeout_seconds ?: config('game.generator.default_timeout', 1800);
+                    $generator->update(['cooldown_until' => now()->addSeconds($timeout)]);
+                    break;
+                }
+            }
+        });
+
+        return [
+            'success' => true,
+            'items' => $items,
+            'tapped' => count($items),
+            'generator' => $generator->fresh(),
+            'energy' => $this->energyService->getCurrentEnergy($user),
+            'energy_max' => config('game.energy.max'),
+        ];
+    }
 
     public function tap(User $user, int $generatorId): array
     {
