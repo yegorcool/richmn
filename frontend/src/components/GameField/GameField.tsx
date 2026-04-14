@@ -86,7 +86,7 @@ export function GameField() {
     items, generators, energy, setEnergy,
     addItem, removeItems, updateItemPosition,
     replaceGenerator, updateGeneratorPosition,
-    refreshState, pendingMoves: pendingMovesRef, flushPendingMoves,
+    pendingMoves: pendingMovesRef, flushPendingMoves,
   } = useGame();
   const platform = usePlatform();
   const itemsRef = useRef(items);
