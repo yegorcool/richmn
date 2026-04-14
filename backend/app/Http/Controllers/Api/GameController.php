@@ -14,6 +14,7 @@ use App\Services\GeneratorService;
 use App\Services\MergeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class GameController extends Controller
 {
@@ -74,9 +75,12 @@ class GameController extends Controller
             'item_id_2' => 'required|integer',
         ]);
 
+        Log::info("[MERGE:controller] incoming request user={$user->id} item_id_1={$validated['item_id_1']} item_id_2={$validated['item_id_2']}");
+
         $result = $merge->executeMerge($user, $validated['item_id_1'], $validated['item_id_2']);
 
         if (!$result['valid']) {
+            Log::warning("[MERGE:controller] merge failed: {$result['error']}");
             return response()->json(['error' => $result['error']], 422);
         }
 
@@ -100,7 +104,7 @@ class GameController extends Controller
             ->where('level', $newItem->item_level)
             ->first();
 
-        return response()->json([
+        $response = [
             'new_item' => array_merge($newItem->toArray(), [
                 'theme_slug' => $newItem->theme?->slug,
                 'image_url' => $itemDef?->image_path,
@@ -111,7 +115,11 @@ class GameController extends Controller
             'energy' => $result['energy'],
             'experience_gained' => $result['experience_gained'],
             'character_line' => $characterLine,
-        ]);
+        ];
+
+        Log::info("[MERGE:controller] response new_item_id={$newItem->id} lvl={$newItem->item_level} chain={$result['chain_length']} consumed=" . json_encode($result['consumed_ids'] ?? []));
+
+        return response()->json($response);
     }
 
     public function tapGenerator(Request $request, GeneratorService $generators, EnergyService $energy): JsonResponse

@@ -737,14 +737,27 @@ export function GameField() {
           item_name: currentItem.item_name,
         };
 
+        const mergeTs = Date.now();
+        console.log(`[MERGE:${mergeTs}] START drag=${currentItem.id}(lvl=${currentItem.item_level}) target=${targetItem.id}(lvl=${targetItem.item_level}) theme=${currentItem.theme_slug} → optimistic tempId=${tempId} expectedLvl=${newLevel}`);
+        console.log(`[MERGE:${mergeTs}] items before remove:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
+
         const savedItems = [{ ...currentItem }, { ...targetItem }];
         removeItems([currentItem.id, targetItem.id]);
         addItem(optimisticItem);
 
+        console.log(`[MERGE:${mergeTs}] items after optimistic:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
+
         gameApi.merge(currentItem.id, targetItem.id).then((result) => {
+          console.log(`[MERGE:${mergeTs}] API OK new_item id=${result.new_item.id} lvl=${result.new_item.item_level} chain=${result.chain_length} consumed=${JSON.stringify(result.consumed_ids)}`);
+          console.log(`[MERGE:${mergeTs}] items before apply:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
+
           const idsToRemove = [tempId, ...(result.consumed_ids ?? [])];
+          console.log(`[MERGE:${mergeTs}] removing ids: ${JSON.stringify(idsToRemove)}`);
           removeItems(idsToRemove);
           addItem(result.new_item);
+
+          console.log(`[MERGE:${mergeTs}] items after apply:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
+
           energyRef.current = result.energy;
           setEnergy(result.energy);
 
@@ -753,7 +766,8 @@ export function GameField() {
           if (result.character_line) {
             window.dispatchEvent(new CustomEvent('character-line', { detail: result.character_line }));
           }
-        }).catch(() => {
+        }).catch((err) => {
+          console.error(`[MERGE:${mergeTs}] API FAIL`, err);
           removeItems([tempId]);
           savedItems.forEach((si) => addItem(si));
         });

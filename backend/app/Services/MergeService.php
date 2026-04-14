@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Item;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MergeService
 {
@@ -36,18 +37,26 @@ class MergeService
 
     public function executeMerge(User $user, int $itemId1, int $itemId2): array
     {
+        $mergeId = substr(md5(uniqid('', true)), 0, 8);
+        Log::info("[MERGE:{$mergeId}] request user={$user->id} item1={$itemId1} item2={$itemId2}");
+
         $validation = $this->validateMerge($user, $itemId1, $itemId2);
         if (!$validation['valid']) {
+            Log::warning("[MERGE:{$mergeId}] validation failed: {$validation['error']}");
             return $validation;
         }
 
         $item1 = $validation['item1'];
         $item2 = $validation['item2'];
 
-        return DB::transaction(function () use ($user, $item1, $item2) {
+        Log::info("[MERGE:{$mergeId}] validated item1=id:{$item1->id}(lvl={$item1->item_level},theme={$item1->theme_id},{$item1->grid_x}:{$item1->grid_y}) item2=id:{$item2->id}(lvl={$item2->item_level},{$item2->grid_x}:{$item2->grid_y})");
+
+        return DB::transaction(function () use ($user, $item1, $item2, $mergeId) {
             $newLevel = $item1->item_level + 1;
             $targetX = $item2->grid_x;
             $targetY = $item2->grid_y;
+
+            Log::info("[MERGE:{$mergeId}] deleting items {$item1->id},{$item2->id} → creating lvl={$newLevel} at {$targetX}:{$targetY}");
 
             $item1->delete();
             $item2->delete();
@@ -60,9 +69,16 @@ class MergeService
                 'grid_y' => $targetY,
             ]);
 
-            $chainResult = $this->checkChainMerge($user, $newItem);
+            Log::info("[MERGE:{$mergeId}] created newItem id={$newItem->id} lvl={$newLevel}, checking chain merge...");
+
+            $allUserItems = Item::where('user_id', $user->id)->get();
+            Log::info("[MERGE:{$mergeId}] all user items: " . $allUserItems->map(fn($i) => "id:{$i->id}(lvl={$i->item_level},{$i->grid_x}:{$i->grid_y})")->join(', '));
+
+            $chainResult = $this->checkChainMerge($user, $newItem, $mergeId);
             $chainLength = 1 + ($chainResult['chain_length'] ?? 0);
             $finalItem = $chainResult['final_item'] ?? $newItem;
+
+            Log::info("[MERGE:{$mergeId}] DONE finalItem id={$finalItem->id} lvl={$finalItem->item_level} chainLength={$chainLength} consumed=" . json_encode($chainResult['consumed_ids'] ?? []));
 
             $expGained = $this->calculateExperience($newLevel, $chainLength);
             $user->increment('experience', $expGained);
@@ -79,19 +95,25 @@ class MergeService
         });
     }
 
-    private function checkChainMerge(User $user, Item $item): array
+    private function checkChainMerge(User $user, Item $item, string $mergeId = ''): array
     {
         $theme = $item->theme;
         if ($item->item_level >= $theme->getMaxLevel()) {
+            Log::info("[MERGE:{$mergeId}] chain: item {$item->id} at max level, stop");
             return ['chain_length' => 0, 'final_item' => $item, 'consumed_ids' => []];
         }
 
         $adjacent = $this->getAdjacentItems($user, $item);
+        Log::info("[MERGE:{$mergeId}] chain: item {$item->id}(lvl={$item->item_level},{$item->grid_x}:{$item->grid_y}) adjacent=[" . $adjacent->map(fn($a) => "id:{$a->id}(lvl={$a->item_level},{$a->grid_x}:{$a->grid_y})")->join(', ') . ']');
+
         $matchingItem = $adjacent->first(fn(Item $adj) => $adj->canMergeWith($item));
 
         if (!$matchingItem) {
+            Log::info("[MERGE:{$mergeId}] chain: no matching adjacent, stop");
             return ['chain_length' => 0, 'final_item' => $item, 'consumed_ids' => []];
         }
+
+        Log::info("[MERGE:{$mergeId}] chain: MATCH found id={$matchingItem->id}(lvl={$matchingItem->item_level}), merging → lvl=" . ($item->item_level + 1));
 
         $consumedId = $matchingItem->id;
         $newLevel = $item->item_level + 1;
@@ -109,7 +131,9 @@ class MergeService
             'grid_y' => $targetY,
         ]);
 
-        $further = $this->checkChainMerge($user, $chainItem);
+        Log::info("[MERGE:{$mergeId}] chain: created chainItem id={$chainItem->id} lvl={$newLevel}, recursing...");
+
+        $further = $this->checkChainMerge($user, $chainItem, $mergeId);
 
         return [
             'chain_length' => 1 + ($further['chain_length'] ?? 0),
