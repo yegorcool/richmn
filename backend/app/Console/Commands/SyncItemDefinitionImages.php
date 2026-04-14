@@ -14,9 +14,12 @@ class SyncItemDefinitionImages extends Command
                             {--dry-run : Показать изменения без записи в БД}
                             {--force : Перезаписать image_url, даже если локальный файл уже задан}';
 
-    protected $description = 'Сопоставить файлы в storage/app/public/items/{theme}/ с записями item_definitions (image_url)';
+    protected $description = 'Сопоставить файлы items/<slug>/ и generators/ с item_definitions.image_url и themes.generator_image_url';
 
     private const EXT = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
+
+    /** При нескольких расширениях для одного slug генератора предпочитаем более «типичный» формат. */
+    private const GENERATOR_EXT_PRIORITY = ['png' => 5, 'webp' => 4, 'jpg' => 3, 'jpeg' => 3, 'svg' => 2];
 
     public function handle(): int
     {
@@ -35,11 +38,34 @@ class SyncItemDefinitionImages extends Command
             $themes = Theme::orderBy('slug')->get();
         }
 
-        $updated = 0;
-        $skipped = 0;
-        $noFile = 0;
+        $generatorBySlug = $disk->exists('generators')
+            ? $this->indexGeneratorFiles($disk->files('generators'))
+            : [];
+
+        $genUpdated = 0;
+        $genSkipped = 0;
+        $genNoFile = 0;
+        $itemUpdated = 0;
+        $itemSkipped = 0;
+        $itemNoFile = 0;
 
         foreach ($themes as $theme) {
+            $genPath = $generatorBySlug[$theme->slug] ?? null;
+
+            if ($genPath === null) {
+                $genNoFile++;
+            } elseif (!$this->shouldUpdateThemeGenerator($theme, $genPath, $force)) {
+                $genSkipped++;
+                $this->line("  [skip] генератор {$theme->slug}: уже задано");
+            } elseif ($dry) {
+                $this->line("  [dry] генератор {$theme->slug} → {$genPath}");
+                $genUpdated++;
+            } else {
+                $theme->update(['generator_image_url' => $genPath]);
+                $genUpdated++;
+                $this->info("  [ok] генератор {$theme->slug} → {$genPath}");
+            }
+
             $prefix = 'items/' . $theme->slug;
             if (!$disk->exists($prefix)) {
                 continue;
@@ -54,36 +80,87 @@ class SyncItemDefinitionImages extends Command
                 $path = $this->resolvePathForDefinition($def, $byLevel, $bySlug);
 
                 if ($path === null) {
-                    $noFile++;
-                    $this->line("  [—] {$theme->slug} L{$def->level} {$def->name}: файла нет");
+                    $itemNoFile++;
+                    $this->line("  [—] предмет {$theme->slug} L{$def->level} {$def->name}: файла нет");
                     continue;
                 }
 
-                if (!$this->shouldUpdate($def, $path, $force)) {
-                    $skipped++;
-                    $this->line("  [skip] {$theme->slug} L{$def->level} {$def->name}: уже задано");
+                if (!$this->shouldUpdateItemDefinition($def, $path, $force)) {
+                    $itemSkipped++;
+                    $this->line("  [skip] предмет {$theme->slug} L{$def->level} {$def->name}: уже задано");
                     continue;
                 }
 
                 if ($dry) {
-                    $this->line("  [dry] {$theme->slug} L{$def->level} {$def->name} → {$path}");
-                    $updated++;
+                    $this->line("  [dry] предмет {$theme->slug} L{$def->level} {$def->name} → {$path}");
+                    $itemUpdated++;
                     continue;
                 }
 
                 $def->update(['image_url' => $path]);
-                $updated++;
-                $this->info("  [ok] {$theme->slug} L{$def->level} {$def->name} → {$path}");
+                $itemUpdated++;
+                $this->info("  [ok] предмет {$theme->slug} L{$def->level} {$def->name} → {$path}");
             }
         }
 
         $this->newLine();
-        $this->line(
-            ($dry ? '[dry-run] ' : '')
-            . "Обновлено: {$updated}, пропущено: {$skipped}, без файла на диске: {$noFile}"
-        );
+        $prefixLabel = $dry ? '[dry-run] ' : '';
+        $this->line("{$prefixLabel}Генераторы — обновлено: {$genUpdated}, пропущено: {$genSkipped}, без файла: {$genNoFile}");
+        $this->line("{$prefixLabel}Предметы — обновлено: {$itemUpdated}, пропущено: {$itemSkipped}, без файла: {$itemNoFile}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  list<string>  $files  Пути вида generators/coffee.png
+     * @return array<string, string>  slug темы → относительный путь на диске
+     */
+    private function indexGeneratorFiles(array $files): array
+    {
+        /** @var array<string, array{path: string, priority: int}> $candidates */
+        $candidates = [];
+
+        foreach ($files as $path) {
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION) ?: '');
+            if (!in_array($ext, self::EXT, true)) {
+                continue;
+            }
+
+            $base = pathinfo($path, PATHINFO_FILENAME);
+            if ($base === '') {
+                continue;
+            }
+
+            $priority = self::GENERATOR_EXT_PRIORITY[$ext] ?? 0;
+            if (!isset($candidates[$base]) || $candidates[$base]['priority'] < $priority) {
+                $candidates[$base] = ['path' => $path, 'priority' => $priority];
+            }
+        }
+
+        $bySlug = [];
+        foreach ($candidates as $slug => $row) {
+            $bySlug[$slug] = $row['path'];
+        }
+
+        return $bySlug;
+    }
+
+    private function shouldUpdateThemeGenerator(Theme $theme, string $newPath, bool $force): bool
+    {
+        if ($force) {
+            return $theme->generator_image_url !== $newPath;
+        }
+
+        $current = $theme->generator_image_url;
+        if ($current === null || $current === '') {
+            return true;
+        }
+
+        if (str_starts_with($current, 'http://') || str_starts_with($current, 'https://')) {
+            return true;
+        }
+
+        return !Storage::disk('public')->exists($current);
     }
 
     /**
@@ -149,7 +226,7 @@ class SyncItemDefinitionImages extends Command
         return $bySlug[$def->slug] ?? null;
     }
 
-    private function shouldUpdate(ItemDefinition $def, string $newPath, bool $force): bool
+    private function shouldUpdateItemDefinition(ItemDefinition $def, string $newPath, bool $force): bool
     {
         if ($force) {
             return $def->image_url !== $newPath;
