@@ -14,6 +14,17 @@ const GENERATOR_DRAG_THRESHOLD_PX = 12;
 
 const textureCache = new Map<string, Texture>();
 
+const ITEM_AND_GENERATOR_IMAGE_VERSION = '2';
+
+/** Cache-bust CDN/static item and generator art (Pixi `Assets.load`). */
+function appendItemImageVersion(url: string): string {
+  const hashIdx = url.indexOf('#');
+  const base = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+  const hash = hashIdx >= 0 ? url.slice(hashIdx) : '';
+  const join = base.includes('?') ? '&' : '?';
+  return `${base}${join}v=${ITEM_AND_GENERATOR_IMAGE_VERSION}${hash}`;
+}
+
 /** Iconify SVGs default to a small intrinsic size; rasterize at ~display×DPR so Pixi scaling stays sharp. */
 function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
   if (!imageUrl.includes('api.iconify.design') || !/\.svg(\?|$)/i.test(imageUrl)) {
@@ -26,7 +37,7 @@ function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
 }
 
 async function loadItemTexture(imageUrl: string, displayLogicalPx: number): Promise<Texture | null> {
-  const resolved = resolveTextureUrl(imageUrl, displayLogicalPx);
+  const resolved = appendItemImageVersion(resolveTextureUrl(imageUrl, displayLogicalPx));
   if (textureCache.has(resolved)) {
     return textureCache.get(resolved)!;
   }
@@ -290,25 +301,6 @@ export function GameField() {
     flash.destroy();
 
     spawnParticles(targetX, targetY, 0xFFD700);
-  };
-
-  const playChainCombo = (x: number, y: number, chainLength: number) => {
-    if (chainLength <= 1) return;
-    const layer = animLayerRef.current;
-    if (!layer) return;
-
-    const comboText = new Text({
-      text: `x${chainLength}!`,
-      style: new TextStyle({ fontSize: 22, fontWeight: 'bold', fill: 0xFF6B6B, stroke: { color: 0xFFFFFF, width: 3 } }),
-    });
-    comboText.anchor.set(0.5);
-    comboText.x = x;
-    comboText.y = y - CELL_SIZE / 2;
-    layer.addChild(comboText);
-
-    animateTween(comboText, { y: y - CELL_SIZE * 1.5, alpha: 0 }, 800, easeOutQuad).then(() => {
-      comboText.destroy();
-    });
   };
 
   const spawnParticles = (cx: number, cy: number, color: number) => {
@@ -737,37 +729,20 @@ export function GameField() {
           item_name: currentItem.item_name,
         };
 
-        const mergeTs = Date.now();
-        console.log(`[MERGE:${mergeTs}] START drag=${currentItem.id}(lvl=${currentItem.item_level}) target=${targetItem.id}(lvl=${targetItem.item_level}) theme=${currentItem.theme_slug} → optimistic tempId=${tempId} expectedLvl=${newLevel}`);
-        console.log(`[MERGE:${mergeTs}] items before remove:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
-
         const savedItems = [{ ...currentItem }, { ...targetItem }];
         removeItems([currentItem.id, targetItem.id]);
         addItem(optimisticItem);
 
-        console.log(`[MERGE:${mergeTs}] items after optimistic:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
-
         gameApi.merge(currentItem.id, targetItem.id).then((result) => {
-          console.log(`[MERGE:${mergeTs}] API OK new_item id=${result.new_item.id} lvl=${result.new_item.item_level} chain=${result.chain_length} consumed=${JSON.stringify(result.consumed_ids)}`);
-          console.log(`[MERGE:${mergeTs}] items before apply:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
-
-          const idsToRemove = [tempId, ...(result.consumed_ids ?? [])];
-          console.log(`[MERGE:${mergeTs}] removing ids: ${JSON.stringify(idsToRemove)}`);
-          removeItems(idsToRemove);
+          removeItems([tempId]);
           addItem(result.new_item);
-
-          console.log(`[MERGE:${mergeTs}] items after apply:`, itemsRef.current.map(i => `${i.id}(lvl=${i.item_level},${i.grid_x}:${i.grid_y})`).join(', '));
-
           energyRef.current = result.energy;
           setEnergy(result.energy);
-
-          playChainCombo(targetPos.x, targetPos.y, result.chain_length);
 
           if (result.character_line) {
             window.dispatchEvent(new CustomEvent('character-line', { detail: result.character_line }));
           }
-        }).catch((err) => {
-          console.error(`[MERGE:${mergeTs}] API FAIL`, err);
+        }).catch(() => {
           removeItems([tempId]);
           savedItems.forEach((si) => addItem(si));
         });

@@ -40,8 +40,8 @@ class Analytics {
     this.flush();
   }
 
-  merge(themeSlug: string, resultLevel: number, chainLength: number) {
-    this.track('merge', { theme: themeSlug, result_level: resultLevel, chain_length: chainLength });
+  merge(themeSlug: string, resultLevel: number) {
+    this.track('merge', { theme: themeSlug, result_level: resultLevel });
   }
 
   orderComplete(themeSlug: string, level: number) {

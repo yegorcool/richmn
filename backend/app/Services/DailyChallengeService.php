@@ -20,7 +20,7 @@ class DailyChallengeService
         ],
         'hard' => [
             ['desc' => 'Выполни {n} заказов', 'key' => 'orders_completed', 'min' => 12, 'max' => 15],
-            ['desc' => 'Сделай {n} chain merge', 'key' => 'chain_merges', 'min' => 3, 'max' => 5],
+            ['desc' => 'Сделай {n} merge', 'key' => 'merges', 'min' => 50, 'max' => 70],
             ['desc' => 'Получи предмет {n} уровня', 'key' => 'max_item_level', 'min' => 7, 'max' => 9],
         ],
     ];

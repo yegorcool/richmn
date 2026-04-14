@@ -14,7 +14,6 @@ use App\Services\GeneratorService;
 use App\Services\MergeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class GameController extends Controller
 {
@@ -75,24 +74,20 @@ class GameController extends Controller
             'item_id_2' => 'required|integer',
         ]);
 
-        Log::info("[MERGE:controller] incoming request user={$user->id} item_id_1={$validated['item_id_1']} item_id_2={$validated['item_id_2']}");
-
         $result = $merge->executeMerge($user, $validated['item_id_1'], $validated['item_id_2']);
 
         if (!$result['valid']) {
-            Log::warning("[MERGE:controller] merge failed: {$result['error']}");
             return response()->json(['error' => $result['error']], 422);
         }
 
         $characterLine = null;
-        $trigger = $result['chain_length'] > 1 ? 'chain_merge' : 'merge_nearby';
         $activeOrders = $user->activeOrders()->with('character')->get();
 
         if ($activeOrders->isNotEmpty()) {
             $order = $activeOrders->first();
             $character = $order->character;
             $context = $cls->buildContext($user, $character, $order);
-            $line = $cls->getLine($character, $trigger, $context, $user);
+            $line = $cls->getLine($character, 'merge_nearby', $context, $user);
             if ($line) {
                 $cls->recordShow($user, $line);
                 $characterLine = ['id' => $line->id, 'character_id' => $line->character_id, 'text' => $line->text];
@@ -104,22 +99,16 @@ class GameController extends Controller
             ->where('level', $newItem->item_level)
             ->first();
 
-        $response = [
+        return response()->json([
             'new_item' => array_merge($newItem->toArray(), [
                 'theme_slug' => $newItem->theme?->slug,
                 'image_url' => $itemDef?->image_path,
                 'item_name' => $itemDef?->name,
             ]),
-            'chain_length' => $result['chain_length'],
-            'consumed_ids' => $result['consumed_ids'] ?? [],
             'energy' => $result['energy'],
             'experience_gained' => $result['experience_gained'],
             'character_line' => $characterLine,
-        ];
-
-        Log::info("[MERGE:controller] response new_item_id={$newItem->id} lvl={$newItem->item_level} chain={$result['chain_length']} consumed=" . json_encode($result['consumed_ids'] ?? []));
-
-        return response()->json($response);
+        ]);
     }
 
     public function tapGenerator(Request $request, GeneratorService $generators, EnergyService $energy): JsonResponse

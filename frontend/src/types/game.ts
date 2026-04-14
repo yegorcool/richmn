@@ -139,8 +139,6 @@ export interface CharacterLine {
 
 export interface MergeResult {
   new_item: GameItem;
-  chain_length: number;
-  consumed_ids: number[];
   energy: number;
   character_line: CharacterLine | null;
   experience_gained: number;

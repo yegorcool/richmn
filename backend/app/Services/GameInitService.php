@@ -10,13 +10,15 @@ use Illuminate\Support\Facades\DB;
 class GameInitService
 {
     /**
-     * Starting positions for the 3 initial generators on the 6x8 grid.
-     * Spread across the bottom half so the player has room above.
+     * Starting positions for the 5 initial generators on the 6x8 grid.
+     * Bottom row of five cells so the player has room above.
      */
     private const STARTER_POSITIONS = [
+        ['x' => 0, 'y' => 5],
         ['x' => 1, 'y' => 5],
+        ['x' => 2, 'y' => 5],
         ['x' => 3, 'y' => 5],
-        ['x' => 5, 'y' => 5],
+        ['x' => 4, 'y' => 5],
     ];
 
     /**
@@ -70,7 +72,7 @@ class GameInitService
         $active = Theme::query()
             ->where('is_active', true)
             ->orderBy('unlock_level')
-            ->limit(3)
+            ->limit(5)
             ->get();
 
         if ($active->isNotEmpty()) {
@@ -79,7 +81,7 @@ class GameInitService
 
         return Theme::query()
             ->orderBy('unlock_level')
-            ->limit(3)
+            ->limit(5)
             ->get();
     }
 }
