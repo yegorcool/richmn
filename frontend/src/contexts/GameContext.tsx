@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { GameItem, Generator, Order, Character, User } from '@/types/game';
+import type { GameItem, Generator, Order, Character, User, ItemDefinitionMap } from '@/types/game';
 import { gameApi } from '@/services/GameApi';
 import { apiClient } from '@/services/ApiClient';
 import { getValidTelegramWidgetQueryParams } from '@/utils/telegramWidgetAuth';
@@ -32,6 +32,8 @@ interface GameContextValue {
   flushPendingMoves: () => void;
   itemsRef: React.MutableRefObject<GameItem[]>;
   generatorsRef: React.MutableRefObject<Generator[]>;
+  /** Populated from `/game/state` — use for optimistic items before `image_url` is set. */
+  itemDefinitionsRef: React.MutableRefObject<ItemDefinitionMap | null>;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -50,6 +52,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const pendingMovesRef = useRef<PendingMove[]>([]);
   const itemsRef = useRef<GameItem[]>([]);
   const generatorsRef = useRef<Generator[]>([]);
+  const itemDefinitionsRef = useRef<ItemDefinitionMap | null>(null);
 
   const setItems = useCallback((newItems: GameItem[]) => {
     itemsRef.current = newItems;
@@ -90,10 +93,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       ]);
 
       if (stateRes.status === 'fulfilled') {
-        setItems(stateRes.value.items);
-        setGenerators(stateRes.value.generators);
-        setEnergy(stateRes.value.energy);
-        setEnergyMax(stateRes.value.energy_max);
+        const st = stateRes.value;
+        setItems(st.items);
+        setGenerators(st.generators);
+        setEnergy(st.energy);
+        setEnergyMax(st.energy_max);
+        if (st.item_definitions) {
+          itemDefinitionsRef.current = st.item_definitions;
+        }
       } else {
         console.error('Failed to load game state:', stateRes.reason);
       }
@@ -130,6 +137,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setGenerators(state.generators);
     setEnergy(state.energy);
     setEnergyMax(state.energy_max);
+    if (state.item_definitions) {
+      itemDefinitionsRef.current = state.item_definitions;
+    }
   }, [flushPendingMoves]);
 
   const refreshOrders = useCallback(async () => {
@@ -207,7 +217,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       refreshState, refreshOrders, setItems, setEnergy, setUser,
       addItem, removeItems, updateItemPosition, replaceGenerator, updateGeneratorPosition,
       pendingMoves: pendingMovesRef, flushPendingMoves,
-      itemsRef, generatorsRef,
+      itemsRef, generatorsRef, itemDefinitionsRef,
     }}>
       {children}
     </GameContext.Provider>

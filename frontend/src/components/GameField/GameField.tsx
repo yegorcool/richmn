@@ -4,7 +4,7 @@ import { useGame } from '@/contexts/GameContext';
 import { usePlatform } from '@/contexts/PlatformContext';
 import { gameApi } from '@/services/GameApi';
 import { GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, CELL_GAP } from '@/config/constants';
-import type { GameItem, Generator } from '@/types/game';
+import type { GameItem, Generator, ItemDefinitionMap } from '@/types/game';
 
 const FIELD_WIDTH = GRID_WIDTH * (CELL_SIZE + CELL_GAP) + CELL_GAP;
 const FIELD_HEIGHT = GRID_HEIGHT * (CELL_SIZE + CELL_GAP) + CELL_GAP;
@@ -76,7 +76,7 @@ export function GameField() {
     addItem, removeItems, updateItemPosition,
     replaceGenerator, updateGeneratorPosition,
     pendingMoves: pendingMovesRef, flushPendingMoves,
-    itemsRef, generatorsRef,
+    itemsRef, generatorsRef, itemDefinitionsRef,
   } = useGame();
   const platform = usePlatform();
   const energyRef = useRef(energy);
@@ -623,7 +623,9 @@ export function GameField() {
 
     const iconSize = CELL_SIZE;
 
-    const textureUrl = item.image_url ?? getItemFallbackImageUrl(item.theme_slug, item.item_level);
+    const textureUrl =
+      item.image_url
+      ?? lookupItemDefinitionImageUrl(itemDefinitionsRef.current, item.theme_id, item.item_level);
     if (textureUrl) {
       const untilTex = new Graphics();
       untilTex.roundRect(-iconSize / 2 + 3, -iconSize / 2 + 3, iconSize - 6, iconSize - 6, 10);
@@ -1013,76 +1015,14 @@ function easeInQuad(t: number): number {
   return t * t;
 }
 
-/**
- * Level chain icons — same URLs as backend ItemDefinitionSeeder (for optimistic items with no image_url).
- */
-const ITEM_FALLBACK_ICONS_BY_THEME: Record<string, string[]> = {
-  coffee: [
-    'https://api.iconify.design/noto/chestnut.svg',
-    'https://api.iconify.design/noto/hot-beverage.svg',
-    'https://api.iconify.design/noto/teacup-without-handle.svg',
-    'https://api.iconify.design/twemoji/hot-beverage.svg',
-    'https://api.iconify.design/openmoji/hot-beverage.svg',
-    'https://api.iconify.design/noto/glass-of-milk.svg',
-    'https://api.iconify.design/noto/tumbler-glass.svg',
-    'https://api.iconify.design/noto/bubble-tea.svg',
-    'https://api.iconify.design/noto/shortcake.svg',
-    'https://api.iconify.design/noto/trophy.svg',
-  ],
-  bakery: [
-    'https://api.iconify.design/game-icons/wheat.svg',
-    'https://api.iconify.design/noto/dumpling.svg',
-    'https://api.iconify.design/twemoji/cookie.svg',
-    'https://api.iconify.design/twemoji/cupcake.svg',
-    'https://api.iconify.design/twemoji/birthday-cake.svg',
-    'https://api.iconify.design/twemoji/croissant.svg',
-    'https://api.iconify.design/twemoji/pie.svg',
-    'https://api.iconify.design/noto/shortcake.svg',
-    'https://api.iconify.design/twemoji/wedding.svg',
-    'https://api.iconify.design/noto/crown.svg',
-  ],
-  products: [
-    'https://api.iconify.design/noto/herb.svg',
-    'https://api.iconify.design/twemoji/seedling.svg',
-    'https://api.iconify.design/twemoji/tomato.svg',
-    'https://api.iconify.design/twemoji/green-salad.svg',
-    'https://api.iconify.design/twemoji/sandwich.svg',
-    'https://api.iconify.design/twemoji/hamburger.svg',
-    'https://api.iconify.design/twemoji/pizza.svg',
-    'https://api.iconify.design/twemoji/sushi.svg',
-    'https://api.iconify.design/twemoji/fork-and-knife-with-plate.svg',
-    'https://api.iconify.design/twemoji/clinking-glasses.svg',
-  ],
-  fabrics: [
-    'https://api.iconify.design/noto/thread.svg',
-    'https://api.iconify.design/noto/yarn.svg',
-    'https://api.iconify.design/noto/rolled-up-newspaper.svg',
-    'https://api.iconify.design/noto/scroll.svg',
-    'https://api.iconify.design/noto/scarf.svg',
-    'https://api.iconify.design/twemoji/couch-and-lamp.svg',
-    'https://api.iconify.design/noto/bed.svg',
-    'https://api.iconify.design/noto/window.svg',
-    'https://api.iconify.design/noto/kimono.svg',
-    'https://api.iconify.design/noto/framed-picture.svg',
-  ],
-  pottery: [
-    'https://api.iconify.design/noto/rock.svg',
-    'https://api.iconify.design/noto/bowl-with-spoon.svg',
-    'https://api.iconify.design/noto/teacup-without-handle.svg',
-    'https://api.iconify.design/noto/shallow-pan-of-food.svg',
-    'https://api.iconify.design/twemoji/amphora.svg',
-    'https://api.iconify.design/noto/teapot.svg',
-    'https://api.iconify.design/noto/fork-and-knife-with-plate.svg',
-    'https://api.iconify.design/noto/sake.svg',
-    'https://api.iconify.design/noto/amphora.svg',
-    'https://api.iconify.design/noto/crown.svg',
-  ],
-};
-
-function getItemFallbackImageUrl(themeSlug: string, level: number): string | null {
-  const chain = ITEM_FALLBACK_ICONS_BY_THEME[themeSlug];
-  if (!chain || level < 1 || level > chain.length) return null;
-  return chain[level - 1];
+function lookupItemDefinitionImageUrl(
+  map: ItemDefinitionMap | null,
+  themeId: number,
+  level: number,
+): string | null {
+  const list = map?.[String(themeId)];
+  if (!list) return null;
+  return list.find((d) => d.level === level)?.image_url ?? null;
 }
 
 /** Thematic generator art (Iconify SVG), aligned with item icons in ItemDefinitionSeeder. */
