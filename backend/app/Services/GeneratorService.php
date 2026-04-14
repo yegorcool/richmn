@@ -212,20 +212,17 @@ class GeneratorService
             )
             ->toArray();
 
-        $offsets = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+        $maxRadius = max(6, 8);
 
-        foreach ($offsets as [$dx, $dy]) {
-            $x = $generator->grid_x + $dx;
-            $y = $generator->grid_y + $dy;
-            if ($x >= 0 && $x < 6 && $y >= 0 && $y < 8 && !in_array("{$x},{$y}", $occupied)) {
-                return ['x' => $x, 'y' => $y];
-            }
-        }
-
-        for ($y = 0; $y < 8; $y++) {
-            for ($x = 0; $x < 6; $x++) {
-                if (!in_array("{$x},{$y}", $occupied)) {
-                    return ['x' => $x, 'y' => $y];
+        for ($r = 1; $r <= $maxRadius; $r++) {
+            for ($dx = -$r; $dx <= $r; $dx++) {
+                for ($dy = -$r; $dy <= $r; $dy++) {
+                    if (max(abs($dx), abs($dy)) !== $r) continue;
+                    $x = $generator->grid_x + $dx;
+                    $y = $generator->grid_y + $dy;
+                    if ($x >= 0 && $x < 6 && $y >= 0 && $y < 8 && !in_array("{$x},{$y}", $occupied)) {
+                        return ['x' => $x, 'y' => $y];
+                    }
                 }
             }
         }

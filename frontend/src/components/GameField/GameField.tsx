@@ -425,25 +425,23 @@ export function GameField() {
 
   // ── Tap Queue ────────────────────────────────────────────
 
-  const NEIGHBOR_OFFSETS: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
-
   const findLocalEmptySlot = (genX: number, genY: number): { x: number; y: number } | null => {
     const occupied = new Set<string>();
     for (const it of itemsRef.current) occupied.add(`${it.grid_x},${it.grid_y}`);
     for (const g of generatorsRef.current) occupied.add(`${g.grid_x},${g.grid_y}`);
     for (const key of reservedCellsRef.current) occupied.add(key);
 
-    for (const [dx, dy] of NEIGHBOR_OFFSETS) {
-      const x = genX + dx;
-      const y = genY + dy;
-      if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT && !occupied.has(`${x},${y}`)) {
-        return { x, y };
-      }
-    }
-
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      for (let x = 0; x < GRID_WIDTH; x++) {
-        if (!occupied.has(`${x},${y}`)) return { x, y };
+    const maxRadius = Math.max(GRID_WIDTH, GRID_HEIGHT);
+    for (let r = 1; r <= maxRadius; r++) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = genX + dx;
+          const y = genY + dy;
+          if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT && !occupied.has(`${x},${y}`)) {
+            return { x, y };
+          }
+        }
       }
     }
 
@@ -911,6 +909,16 @@ export function GameField() {
         }
 
         if (gx === ptr.startGridX && gy === ptr.startGridY) {
+          container.x = ptr.startSpriteX;
+          container.y = ptr.startSpriteY;
+          return;
+        }
+
+        const cellOccupied =
+          itemsRef.current.some((i) => i.grid_x === gx && i.grid_y === gy) ||
+          generatorsRef.current.some((g) => g.id !== gen.id && g.grid_x === gx && g.grid_y === gy);
+
+        if (cellOccupied) {
           container.x = ptr.startSpriteX;
           container.y = ptr.startSpriteY;
           return;
