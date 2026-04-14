@@ -14,7 +14,7 @@ const GENERATOR_DRAG_THRESHOLD_PX = 12;
 
 const textureCache = new Map<string, Texture>();
 
-const ITEM_AND_GENERATOR_IMAGE_VERSION = '2';
+const ITEM_AND_GENERATOR_IMAGE_VERSION = '3';
 
 /** Cache-bust CDN/static item and generator art (Pixi `Assets.load`). */
 function appendItemImageVersion(url: string): string {
