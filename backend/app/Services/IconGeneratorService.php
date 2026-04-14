@@ -11,6 +11,7 @@ use RuntimeException;
 class IconGeneratorService
 {
     private string $apiKey;
+    private string $baseUrl;
     private string $model;
     private string $size;
     private string $quality;
@@ -20,6 +21,7 @@ class IconGeneratorService
     public function __construct()
     {
         $this->apiKey = config('openai.api_key', '');
+        $this->baseUrl = rtrim(config('imagegen.base_url', 'https://api.openai.com'), '/');
         $this->model = config('imagegen.model', 'gpt-image-1');
         $this->size = config('imagegen.size', '1024x1024');
         $this->quality = config('imagegen.quality', 'medium');
@@ -69,7 +71,7 @@ class IconGeneratorService
         $response = Http::timeout(120)
             ->withToken($this->apiKey)
             ->asMultipart()
-            ->post('https://api.openai.com/v1/images/edits', $multipart);
+            ->post("{$this->baseUrl}/v1/images/edits", $multipart);
 
         if (!$response->successful()) {
             $error = $response->json('error.message', $response->body());
@@ -88,7 +90,7 @@ class IconGeneratorService
     {
         $response = Http::timeout(120)
             ->withToken($this->apiKey)
-            ->post('https://api.openai.com/v1/images/generations', [
+            ->post("{$this->baseUrl}/v1/images/generations", [
                 'model' => $this->model,
                 'prompt' => $prompt,
                 'n' => 1,

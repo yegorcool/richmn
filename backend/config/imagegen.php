@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com'),
     'model' => env('IMAGEGEN_MODEL', 'gpt-image-1'),
     'size' => '1024x1024',
     'quality' => 'medium',
