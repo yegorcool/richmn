@@ -809,6 +809,9 @@ export function GameField() {
           energyRef.current = prevEnergy;
           setEnergy(prevEnergy);
         });
+      } else if (targetItem || generatorsRef.current.some((g) => g.grid_x === gx && g.grid_y === gy)) {
+        container.x = drag.startX;
+        container.y = drag.startY;
       } else {
         updateItemPosition(item.id, gx, gy);
         pendingMovesRef.current.push({ type: 'item', id: item.id, grid_x: gx, grid_y: gy });
@@ -848,7 +851,7 @@ export function GameField() {
       style: new TextStyle({ fontSize: 10, fill: 0x666666 }),
     });
     chargeText.anchor.set(0.5);
-    chargeText.y = 14;
+    chargeText.y = 19;
     container.addChild(chargeText);
     generatorChargeTextRef.current.set(gen.id, chargeText);
 

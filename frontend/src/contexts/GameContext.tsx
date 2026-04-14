@@ -139,7 +139,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const replaceGenerator = useCallback((generator: Generator) => {
-    setGenerators((prev) => prev.map((g) => (g.id === generator.id ? generator : g)));
+    setGenerators((prev) =>
+      prev.map((g) => {
+        if (g.id !== generator.id) return g;
+        // Tap/move responses often omit `theme`; keep prior relation so the field icon stays correct.
+        const theme = generator.theme ?? g.theme;
+        return theme ? { ...generator, theme } : generator;
+      }),
+    );
   }, []);
 
   const updateGeneratorPosition = useCallback((id: number, gridX: number, gridY: number) => {
