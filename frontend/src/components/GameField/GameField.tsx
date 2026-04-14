@@ -210,14 +210,22 @@ export function GameField() {
   const drawGrid = (app: Application) => {
     const grid = new Graphics();
 
+    /** Checkerboard: light #d0bb99, dark #cbad87 (darker — with slight corner radius). */
+    const LIGHT = 0xd0bb99;
+    const DARK = 0xcbad87;
+    const darkCornerRadius = 4;
+
+    grid.rect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
+    grid.fill({ color: LIGHT });
+
     for (let y = 0; y < GRID_HEIGHT; y++) {
       for (let x = 0; x < GRID_WIDTH; x++) {
         const px = CELL_GAP + x * (CELL_SIZE + CELL_GAP);
         const py = CELL_GAP + y * (CELL_SIZE + CELL_GAP);
-
-        grid.roundRect(px, py, CELL_SIZE, CELL_SIZE, 8);
-        grid.fill({ color: 0xF0E6D6, alpha: 0.5 });
-        grid.stroke({ color: 0xE0D6C6, width: 1 });
+        if ((x + y) % 2 === 1) {
+          grid.roundRect(px, py, CELL_SIZE, CELL_SIZE, darkCornerRadius);
+          grid.fill({ color: DARK });
+        }
       }
     }
 
