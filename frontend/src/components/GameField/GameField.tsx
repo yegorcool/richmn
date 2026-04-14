@@ -623,9 +623,17 @@ export function GameField() {
 
     const iconSize = CELL_SIZE;
 
-    if (item.image_url) {
-      loadItemTexture(item.image_url, iconSize).then((texture) => {
-        if (texture && !container.destroyed) {
+    const textureUrl = item.image_url ?? getItemFallbackImageUrl(item.theme_slug, item.item_level);
+    if (textureUrl) {
+      const untilTex = new Graphics();
+      untilTex.roundRect(-iconSize / 2 + 3, -iconSize / 2 + 3, iconSize - 6, iconSize - 6, 10);
+      untilTex.fill({ color: 0xd8c8ae, alpha: 0.85 });
+      container.addChild(untilTex);
+
+      loadItemTexture(textureUrl, iconSize).then((texture) => {
+        if (container.destroyed) return;
+        untilTex.destroy();
+        if (texture) {
           const sprite = new Sprite(texture);
           sprite.width = iconSize;
           sprite.height = iconSize;
@@ -1003,6 +1011,78 @@ function easeOutQuad(t: number): number {
 
 function easeInQuad(t: number): number {
   return t * t;
+}
+
+/**
+ * Level chain icons — same URLs as backend ItemDefinitionSeeder (for optimistic items with no image_url).
+ */
+const ITEM_FALLBACK_ICONS_BY_THEME: Record<string, string[]> = {
+  coffee: [
+    'https://api.iconify.design/noto/chestnut.svg',
+    'https://api.iconify.design/noto/hot-beverage.svg',
+    'https://api.iconify.design/noto/teacup-without-handle.svg',
+    'https://api.iconify.design/twemoji/hot-beverage.svg',
+    'https://api.iconify.design/openmoji/hot-beverage.svg',
+    'https://api.iconify.design/noto/glass-of-milk.svg',
+    'https://api.iconify.design/noto/tumbler-glass.svg',
+    'https://api.iconify.design/noto/bubble-tea.svg',
+    'https://api.iconify.design/noto/shortcake.svg',
+    'https://api.iconify.design/noto/trophy.svg',
+  ],
+  bakery: [
+    'https://api.iconify.design/game-icons/wheat.svg',
+    'https://api.iconify.design/noto/dumpling.svg',
+    'https://api.iconify.design/twemoji/cookie.svg',
+    'https://api.iconify.design/twemoji/cupcake.svg',
+    'https://api.iconify.design/twemoji/birthday-cake.svg',
+    'https://api.iconify.design/twemoji/croissant.svg',
+    'https://api.iconify.design/twemoji/pie.svg',
+    'https://api.iconify.design/noto/shortcake.svg',
+    'https://api.iconify.design/twemoji/wedding.svg',
+    'https://api.iconify.design/noto/crown.svg',
+  ],
+  products: [
+    'https://api.iconify.design/noto/herb.svg',
+    'https://api.iconify.design/twemoji/seedling.svg',
+    'https://api.iconify.design/twemoji/tomato.svg',
+    'https://api.iconify.design/twemoji/green-salad.svg',
+    'https://api.iconify.design/twemoji/sandwich.svg',
+    'https://api.iconify.design/twemoji/hamburger.svg',
+    'https://api.iconify.design/twemoji/pizza.svg',
+    'https://api.iconify.design/twemoji/sushi.svg',
+    'https://api.iconify.design/twemoji/fork-and-knife-with-plate.svg',
+    'https://api.iconify.design/twemoji/clinking-glasses.svg',
+  ],
+  fabrics: [
+    'https://api.iconify.design/noto/thread.svg',
+    'https://api.iconify.design/noto/yarn.svg',
+    'https://api.iconify.design/noto/rolled-up-newspaper.svg',
+    'https://api.iconify.design/noto/scroll.svg',
+    'https://api.iconify.design/noto/scarf.svg',
+    'https://api.iconify.design/twemoji/couch-and-lamp.svg',
+    'https://api.iconify.design/noto/bed.svg',
+    'https://api.iconify.design/noto/window.svg',
+    'https://api.iconify.design/noto/kimono.svg',
+    'https://api.iconify.design/noto/framed-picture.svg',
+  ],
+  pottery: [
+    'https://api.iconify.design/noto/rock.svg',
+    'https://api.iconify.design/noto/bowl-with-spoon.svg',
+    'https://api.iconify.design/noto/teacup-without-handle.svg',
+    'https://api.iconify.design/noto/shallow-pan-of-food.svg',
+    'https://api.iconify.design/twemoji/amphora.svg',
+    'https://api.iconify.design/noto/teapot.svg',
+    'https://api.iconify.design/noto/fork-and-knife-with-plate.svg',
+    'https://api.iconify.design/noto/sake.svg',
+    'https://api.iconify.design/noto/amphora.svg',
+    'https://api.iconify.design/noto/crown.svg',
+  ],
+};
+
+function getItemFallbackImageUrl(themeSlug: string, level: number): string | null {
+  const chain = ITEM_FALLBACK_ICONS_BY_THEME[themeSlug];
+  if (!chain || level < 1 || level > chain.length) return null;
+  return chain[level - 1];
 }
 
 /** Thematic generator art (Iconify SVG), aligned with item icons in ItemDefinitionSeeder. */
