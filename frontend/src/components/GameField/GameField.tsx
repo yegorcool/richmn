@@ -14,12 +14,6 @@ const GENERATOR_DRAG_THRESHOLD_PX = 12;
 
 const textureCache = new Map<string, Texture>();
 
-/** Cache-bust static item/generator art when assets are replaced on the server. */
-function withItemImageVersion(imageUrl: string): string {
-  const join = imageUrl.includes('?') ? '&' : '?';
-  return `${imageUrl}${join}v=1`;
-}
-
 /** Iconify SVGs default to a small intrinsic size; rasterize at ~display×DPR so Pixi scaling stays sharp. */
 function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
   if (!imageUrl.includes('api.iconify.design') || !/\.svg(\?|$)/i.test(imageUrl)) {
@@ -32,7 +26,7 @@ function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
 }
 
 async function loadItemTexture(imageUrl: string, displayLogicalPx: number): Promise<Texture | null> {
-  const resolved = resolveTextureUrl(withItemImageVersion(imageUrl), displayLogicalPx);
+  const resolved = resolveTextureUrl(imageUrl, displayLogicalPx);
   if (textureCache.has(resolved)) {
     return textureCache.get(resolved)!;
   }
@@ -64,6 +58,8 @@ export function GameField() {
   } | null>(null);
   const animLayerRef = useRef<Container | null>(null);
   const tapQueueRef = useRef<{ generatorId: number; tempId: number; cellKey: string }[]>([]);
+  /** Item ids (optimistic temp) that should fly from generator cell with scale-up on first draw. */
+  const pendingGeneratorSpawnRef = useRef<Map<number, { fromGx: number; fromGy: number }>>(new Map());
   const tapProcessingRef = useRef(false);
   const tapFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reservedCellsRef = useRef<Set<string>>(new Set());
@@ -414,6 +410,8 @@ export function GameField() {
   };
 
   const TAP_BATCH_DELAY_MS = 80;
+  const GENERATOR_SPAWN_MS = 380;
+  const GENERATOR_SPAWN_START_SCALE = 0.22;
 
   const flushTapQueue = async () => {
     tapFlushTimerRef.current = null;
@@ -554,6 +552,7 @@ export function GameField() {
     };
 
     addItem(optimisticItem);
+    pendingGeneratorSpawnRef.current.set(tempId, { fromGx: gen.grid_x, fromGy: gen.grid_y });
 
     tapQueueRef.current.push({ generatorId, tempId, cellKey });
     scheduleTapFlush();
@@ -583,6 +582,25 @@ export function GameField() {
       const pos = gridToPixel(item.grid_x, item.grid_y);
       container.x = pos.x;
       container.y = pos.y;
+
+      const spawn = pendingGeneratorSpawnRef.current.get(item.id);
+      if (spawn) {
+        pendingGeneratorSpawnRef.current.delete(item.id);
+        const fromPos = gridToPixel(spawn.fromGx, spawn.fromGy);
+        container.x = fromPos.x;
+        container.y = fromPos.y;
+        container.scale.set(GENERATOR_SPAWN_START_SCALE);
+        container.zIndex = 2000;
+        void animateTween(
+          container,
+          { x: pos.x, y: pos.y, scaleX: 1, scaleY: 1 },
+          GENERATOR_SPAWN_MS,
+          easeOutBack,
+        ).then(() => {
+          if (!container.destroyed) container.zIndex = 0;
+        });
+      }
+
       app.stage.addChild(container);
       itemSpritesRef.current.set(item.id, container);
     });
