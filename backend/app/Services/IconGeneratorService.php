@@ -77,9 +77,12 @@ class IconGeneratorService
         return implode(' ', [
             "A single game icon of a merge-2 generator machine: \"{$generatorName}\".",
             "Theme collection: {$themeName}.",
-            'Looks like a cozy appliance or station that produces items, not a single product.',
-            'Match the visual style of the reference images: warm colors, soft 3D shading,',
-            'thick dark outlines, cartoon casual mobile game aesthetic.',
+            'Looks like a playful appliance or station that produces items, not a single product.',
+            'Vivid saturated candy colors: hot pink, lime green, sky blue, sunny yellow accents;',
+            'high chroma, no brown, sepia, or dull earth tones.',
+            'Glossy enamel or plastic finish, strong specular highlights, jewel shine, subtle glow,',
+            'juicy polished mobile-game look.',
+            'Match reference images for outline weight, soft 3D form, and cartoon proportions only.',
             'Single centered object, no text, no letters, no background elements.',
         ]);
     }
@@ -159,18 +162,21 @@ class IconGeneratorService
     private function buildPrompt(string $itemName, int $level, string $themeName): string
     {
         $levelDescription = match (true) {
-            $level <= 3 => 'Simple, small, basic everyday item.',
-            $level <= 6 => 'Moderately detailed, more refined and colorful.',
-            $level <= 9 => 'Elaborate, richly detailed, vibrant and eye-catching.',
-            default => 'Premium luxurious item with golden accents and a glowing effect.',
+            $level <= 3 => 'Simple, small, crisp silhouette with punchy color.',
+            $level <= 6 => 'Moderately detailed, richer hues and cleaner shapes.',
+            $level <= 9 => 'Elaborate, richly detailed, rainbow-bright accents and contrast.',
+            default => 'Premium showpiece: prismatic highlights, extra gloss, starry sparkle hints.',
         };
 
         return implode(' ', [
-            "A single game icon of \"{$itemName}\" for a cozy merge-2 mobile game.",
+            "A single game icon of \"{$itemName}\" for a colorful merge-2 mobile game.",
             "{$themeName} collection, level {$level} of 10.",
             $levelDescription,
-            'Match the visual style of the reference images exactly: warm colors,',
-            'soft 3D shading, thick dark outlines, cartoon casual-game aesthetic.',
+            'Palette: vivid hot pink, lime green, sky blue, sunny yellow; saturated and cheerful;',
+            'no brown, sepia, or muddy neutrals.',
+            'Glossy surfaces, bright specular hits, soft inner glow, jewel-like shine,',
+            'juicy polished casual-game rendering.',
+            'Match reference images for thick dark outlines, soft 3D shading, and cartoon proportions only.',
             'Single centered object, no text, no letters, no background elements.',
         ]);
     }
