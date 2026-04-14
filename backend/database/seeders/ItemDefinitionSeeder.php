@@ -43,7 +43,7 @@ class ItemDefinitionSeeder extends Seeder
             [2, 'Молотый кофе', 'https://api.iconify.design/noto/hot-beverage.svg'],
             [3, 'Эспрессо', 'https://api.iconify.design/noto/teacup-without-handle.svg'],
             [4, 'Американо', 'https://api.iconify.design/twemoji/hot-beverage.svg'],
-            [5, 'Капучино', 'https://api.iconify.design/noto/coffee.svg'],
+            [5, 'Капучино', 'https://api.iconify.design/openmoji/hot-beverage.svg'],
             [6, 'Латте', 'https://api.iconify.design/noto/glass-of-milk.svg'],
             [7, 'Раф', 'https://api.iconify.design/noto/tumbler-glass.svg'],
             [8, 'Фраппучино', 'https://api.iconify.design/noto/bubble-tea.svg'],
