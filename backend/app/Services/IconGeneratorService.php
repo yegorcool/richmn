@@ -49,6 +49,50 @@ class IconGeneratorService
         return $this->saveIcon($resizedPng, $theme->slug, $item->level);
     }
 
+    /**
+     * Generate a merge-game generator machine icon for the theme; saves to storage/app/public/generators/{slug}.png.
+     */
+    public function generateGeneratorIcon(Theme $theme): string
+    {
+        if (empty($this->apiKey)) {
+            throw new RuntimeException('OPENAI_API_KEY is not configured');
+        }
+
+        $prompt = $this->buildGeneratorPrompt($theme->generator_name, $theme->name);
+        $referenceFiles = $this->getReferenceFiles();
+
+        if (empty($referenceFiles)) {
+            $imageBase64 = $this->generateWithoutReferences($prompt);
+        } else {
+            $imageBase64 = $this->generateWithReferences($prompt, $referenceFiles);
+        }
+
+        $resizedPng = $this->resizeImage($imageBase64, $this->iconSize);
+
+        return $this->saveGeneratorIcon($resizedPng, $theme->slug);
+    }
+
+    private function buildGeneratorPrompt(string $generatorName, string $themeName): string
+    {
+        return implode(' ', [
+            "A single game icon of a merge-2 generator machine: \"{$generatorName}\".",
+            "Theme collection: {$themeName}.",
+            'Looks like a cozy appliance or station that produces items, not a single product.',
+            'Match the visual style of the reference images: warm colors, soft 3D shading,',
+            'thick dark outlines, cartoon casual mobile game aesthetic.',
+            'Single centered object, no text, no letters, no background elements.',
+        ]);
+    }
+
+    private function saveGeneratorIcon(string $pngData, string $themeSlug): string
+    {
+        $relativePath = "generators/{$themeSlug}.png";
+
+        Storage::disk('public')->put($relativePath, $pngData);
+
+        return $relativePath;
+    }
+
     private function generateWithReferences(string $prompt, array $referenceFiles): string
     {
         $multipart = [

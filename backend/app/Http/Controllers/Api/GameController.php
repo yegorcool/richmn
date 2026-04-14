@@ -42,14 +42,14 @@ class GameController extends Controller
             return $itemArray;
         });
 
-        $generators = $user->generators()->with('theme:id,slug,name')->get();
+        $generators = $user->generators()->with('theme:id,slug,name,generator_image_url')->get();
         foreach ($generators as $generator) {
             $generator->refreshCooldownIfExpired();
         }
 
         return response()->json([
             'items' => $itemsWithImages,
-            'generators' => $generators,
+            'generators' => $generators->map(fn (Generator $g) => $this->generatorToClientArray($g)),
             'energy' => $energy->getCurrentEnergy($user),
             'energy_max' => config('game.energy.max'),
             'energy_recovery_seconds' => $energy->getRecoverySecondsRemaining($user),
@@ -137,6 +137,10 @@ class GameController extends Controller
             ]);
         }
 
+        if ($result['success'] && isset($result['generator'])) {
+            $result['generator'] = $this->generatorToClientArray($result['generator']);
+        }
+
         return response()->json($result);
     }
 
@@ -163,6 +167,10 @@ class GameController extends Controller
                 'error' => $result['error'],
                 'cooldown_until' => $result['cooldown_until'] ?? null,
             ]);
+        }
+
+        if ($result['success'] && isset($result['generator'])) {
+            $result['generator'] = $this->generatorToClientArray($result['generator']);
         }
 
         return response()->json($result);
@@ -250,7 +258,7 @@ class GameController extends Controller
         if ($generator->grid_x === $gx && $generator->grid_y === $gy) {
             return response()->json([
                 'success' => true,
-                'generator' => $generator->load('theme:id,slug,name'),
+                'generator' => $this->generatorToClientArray($generator->load('theme:id,slug,name,generator_image_url')),
             ]);
         }
 
@@ -280,7 +288,21 @@ class GameController extends Controller
 
         return response()->json([
             'success' => true,
-            'generator' => $generator->fresh()->load('theme:id,slug,name'),
+            'generator' => $this->generatorToClientArray(
+                $generator->fresh()->load('theme:id,slug,name,generator_image_url')
+            ),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function generatorToClientArray(Generator $generator): array
+    {
+        $generator->loadMissing('theme:id,slug,name,generator_image_url');
+        $data = $generator->toArray();
+        $data['image_url'] = $generator->theme?->generator_image_path;
+
+        return $data;
     }
 }

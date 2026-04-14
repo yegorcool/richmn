@@ -837,7 +837,7 @@ export function GameField() {
     container.addChild(bg);
 
     const slug = gen.theme?.slug;
-    const imageUrl = slug ? getGeneratorImageUrl(slug) : null;
+    const imageUrl = gen.image_url ?? (slug ? getGeneratorImageUrl(slug) : null);
 
     const chargeText = new Text({
       text: generatorUnderIconLabel(gen),

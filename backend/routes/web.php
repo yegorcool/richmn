@@ -32,6 +32,7 @@ Route::prefix('admin')->group(function () {
         Route::get('themes/{theme}/edit', [GameConfigController::class, 'editTheme'])->name('admin.themes.edit');
         Route::put('themes/{theme}', [GameConfigController::class, 'updateTheme'])->name('admin.themes.update');
         Route::delete('themes/{theme}', [GameConfigController::class, 'deleteTheme'])->name('admin.themes.delete');
+        Route::post('themes/{theme}/generate-generator-icon', [GameConfigController::class, 'generateGeneratorIcon'])->name('admin.themes.generate-generator-icon');
 
         Route::get('themes/{theme}/items', [GameConfigController::class, 'itemDefinitions'])->name('admin.item-definitions');
         Route::get('themes/{theme}/items/create', [GameConfigController::class, 'createItemDefinition'])->name('admin.item-definitions.create');

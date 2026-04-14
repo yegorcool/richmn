@@ -38,12 +38,29 @@ class GameConfigController extends Controller
             'generator_energy_cost' => 'required|integer|min:0',
             'generator_generation_limit' => 'required|integer|min:1',
             'generator_generation_timeout' => 'required|integer|min:0',
+            'generator_image' => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'generator_image_url_external' => 'nullable|url|max:500',
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
         $validated['chain_config'] = [];
 
-        Theme::create($validated);
+        $generatorImageUrl = null;
+        if ($request->hasFile('generator_image')) {
+            $ext = $request->file('generator_image')->getClientOriginalExtension() ?: 'png';
+            $generatorImageUrl = $request->file('generator_image')->storeAs(
+                'generators',
+                $validated['slug'] . '.' . $ext,
+                'public'
+            );
+        } elseif (!empty($validated['generator_image_url_external'])) {
+            $generatorImageUrl = $validated['generator_image_url_external'];
+        }
+
+        Theme::create(array_merge(
+            collect($validated)->except(['generator_image', 'generator_image_url_external'])->toArray(),
+            ['generator_image_url' => $generatorImageUrl]
+        ));
 
         return redirect()->route('admin.themes')->with('success', 'Тематика создана');
     }
@@ -64,11 +81,57 @@ class GameConfigController extends Controller
             'generator_energy_cost' => 'required|integer|min:0',
             'generator_generation_limit' => 'required|integer|min:1',
             'generator_generation_timeout' => 'required|integer|min:0',
+            'generator_image' => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'generator_image_url_external' => 'nullable|url|max:500',
+            'remove_generator_image' => 'boolean',
         ]);
 
         $validated['is_active'] = $request->boolean('is_active');
+        $oldSlug = $theme->slug;
+        $generatorImageUrl = $theme->generator_image_url;
 
-        $theme->update($validated);
+        if ($request->boolean('remove_generator_image')) {
+            if ($generatorImageUrl && !str_starts_with($generatorImageUrl, 'http')) {
+                Storage::disk('public')->delete($generatorImageUrl);
+            }
+            $generatorImageUrl = null;
+        }
+
+        if ($request->hasFile('generator_image')) {
+            if ($theme->generator_image_url && !str_starts_with($theme->generator_image_url, 'http')) {
+                Storage::disk('public')->delete($theme->generator_image_url);
+            }
+            $ext = $request->file('generator_image')->getClientOriginalExtension() ?: 'png';
+            $generatorImageUrl = $request->file('generator_image')->storeAs(
+                'generators',
+                $validated['slug'] . '.' . $ext,
+                'public'
+            );
+        } elseif (!empty($validated['generator_image_url_external'])) {
+            if ($generatorImageUrl && !str_starts_with($generatorImageUrl, 'http')) {
+                Storage::disk('public')->delete($generatorImageUrl);
+            }
+            $generatorImageUrl = $validated['generator_image_url_external'];
+        }
+
+        if ($oldSlug !== $validated['slug']
+            && $generatorImageUrl
+            && !str_starts_with($generatorImageUrl, 'http')) {
+            $basename = basename($generatorImageUrl);
+            if (str_starts_with($basename, $oldSlug . '.')) {
+                $ext = pathinfo($basename, PATHINFO_EXTENSION) ?: 'png';
+                $newPath = 'generators/' . $validated['slug'] . '.' . $ext;
+                if (Storage::disk('public')->exists($generatorImageUrl)) {
+                    Storage::disk('public')->move($generatorImageUrl, $newPath);
+                    $generatorImageUrl = $newPath;
+                }
+            }
+        }
+
+        $theme->update(array_merge(
+            collect($validated)->except(['generator_image', 'generator_image_url_external', 'remove_generator_image'])->toArray(),
+            ['generator_image_url' => $generatorImageUrl]
+        ));
 
         return redirect()->route('admin.themes')->with('success', 'Тематика обновлена');
     }
@@ -80,6 +143,9 @@ class GameConfigController extends Controller
                 Storage::disk('public')->delete($def->image_url);
             }
         });
+        if ($theme->generator_image_url && !str_starts_with($theme->generator_image_url, 'http')) {
+            Storage::disk('public')->delete($theme->generator_image_url);
+        }
         $theme->delete();
 
         return redirect()->route('admin.themes')->with('success', 'Тематика удалена');
@@ -209,6 +275,28 @@ class GameConfigController extends Controller
 
             $itemDefinition->update(['image_url' => $relativePath]);
             $this->syncChainConfig($theme);
+
+            return response()->json([
+                'success' => true,
+                'image_url' => '/storage/' . $relativePath,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function generateGeneratorIcon(Theme $theme, IconGeneratorService $service)
+    {
+        try {
+            if ($theme->generator_image_url && !str_starts_with($theme->generator_image_url, 'http')) {
+                Storage::disk('public')->delete($theme->generator_image_url);
+            }
+
+            $relativePath = $service->generateGeneratorIcon($theme);
+            $theme->update(['generator_image_url' => $relativePath]);
 
             return response()->json([
                 'success' => true,

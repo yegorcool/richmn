@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Theme extends Model
 {
     protected $fillable = [
-        'name', 'slug', 'generator_name',
+        'name', 'slug', 'generator_name', 'generator_image_url',
         'unlock_level', 'chain_config', 'is_active',
         'generator_energy_cost', 'generator_generation_limit', 'generator_generation_timeout',
     ];
@@ -45,6 +45,20 @@ class Theme extends Model
     public function getMaxLevel(): int
     {
         return count($this->chain_config);
+    }
+
+    /** Public URL for generator icon (upload, external, or null). */
+    public function getGeneratorImagePathAttribute(): ?string
+    {
+        if (!$this->generator_image_url) {
+            return null;
+        }
+
+        if (str_starts_with($this->generator_image_url, 'http')) {
+            return $this->generator_image_url;
+        }
+
+        return '/storage/' . $this->generator_image_url;
     }
 
     public function getItemNameAtLevel(int $level): ?string

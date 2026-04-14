@@ -36,6 +36,8 @@ export interface Generator {
   cooldown_until: string | null;
   grid_x: number;
   grid_y: number;
+  /** Theme generator icon from API; fallback to Iconify by slug in GameField. */
+  image_url?: string | null;
   /** Present when API loads `theme` relation (e.g. game state). */
   theme?: { id: number; slug: string; name: string };
 }

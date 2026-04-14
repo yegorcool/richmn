@@ -14,6 +14,7 @@
                 <th>Название</th>
                 <th>Slug</th>
                 <th>Генератор</th>
+                <th style="width:56px;">Ик. ген.</th>
                 <th>Разблокировка</th>
                 <th>Предметов</th>
                 <th>Энергия</th>
@@ -39,6 +40,13 @@
                 <td>{{ $theme->name }}</td>
                 <td><code>{{ $theme->slug }}</code></td>
                 <td>{{ $theme->generator_name }}</td>
+                <td>
+                    @if($theme->generator_image_path)
+                        <img src="{{ $theme->generator_image_path }}" alt="" class="thumb-48" style="width:40px;height:40px;">
+                    @else
+                        <span class="thumb-placeholder" style="font-size:0.75rem;">—</span>
+                    @endif
+                </td>
                 <td>Lv.{{ $theme->unlock_level }}</td>
                 <td>
                     <a href="{{ route('admin.item-definitions', $theme) }}" class="link-accent">
