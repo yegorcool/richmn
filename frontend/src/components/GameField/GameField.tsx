@@ -14,18 +14,6 @@ const GENERATOR_DRAG_THRESHOLD_PX = 12;
 
 const textureCache = new Map<string, Texture>();
 
-/** One background per theme — same `theme_id` always maps to the same color. */
-const THEME_CELL_BG_COLORS = [
-  0xFFB7B2, 0xA8E6CF, 0xD4A5FF, 0xFFE156, 0x87CEEB,
-  0xFF9A76, 0xC9B1FF, 0x98D8C8, 0xF7DC6F, 0xE8B4BC,
-];
-
-function themeCellBgColor(themeId: number): number {
-  const n = THEME_CELL_BG_COLORS.length;
-  const idx = ((themeId % n) + n) % n;
-  return THEME_CELL_BG_COLORS[idx];
-}
-
 /** Iconify SVGs default to a small intrinsic size; rasterize at ~display×DPR so Pixi scaling stays sharp. */
 function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
   if (!imageUrl.includes('api.iconify.design') || !/\.svg(\?|$)/i.test(imageUrl)) {
@@ -282,7 +270,6 @@ export function GameField() {
   };
 
   const playOverlaySpawnAnimation = (
-    themeId: number,
     imageUrl: string | null | undefined,
     themeSlug: string | undefined,
     fromX: number,
@@ -299,28 +286,21 @@ export function GameField() {
     temp.y = fromY;
     temp.scale.set(0);
 
-    const bg = new Graphics();
-    bg.roundRect(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE, 10);
-    bg.fill({ color: themeCellBgColor(themeId) });
-    temp.addChild(bg);
-
     const emoji = new Text({
       text: getThemeEmoji(themeSlug ?? ''),
-      style: new TextStyle({ fontSize: 20 }),
+      style: new TextStyle({ fontSize: Math.round(CELL_SIZE * 0.55) }),
     });
     emoji.anchor.set(0.5);
-    emoji.y = -8;
     temp.addChild(emoji);
 
     if (imageUrl) {
-      const iconSize = CELL_SIZE * 0.65;
+      const iconSize = CELL_SIZE;
       loadItemTexture(imageUrl, iconSize).then((texture) => {
         if (texture && !temp.destroyed) {
           const sprite = new Sprite(texture);
           sprite.width = iconSize;
           sprite.height = iconSize;
           sprite.anchor.set(0.5);
-          sprite.y = -2;
           sprite.roundPixels = true;
           temp.removeChild(emoji);
           emoji.destroy();
@@ -628,7 +608,6 @@ export function GameField() {
     const genPos = gridToPixel(gen.grid_x, gen.grid_y);
     const itemPos = gridToPixel(slot.x, slot.y);
     playOverlaySpawnAnimation(
-      gen.theme_id,
       null,
       themeSlug,
       genPos.x, genPos.y,
@@ -692,36 +671,33 @@ export function GameField() {
       container.alpha = 0;
     }
 
-    const bg = new Graphics();
-    const color = themeCellBgColor(item.theme_id);
-    bg.roundRect(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE, 10);
-    bg.fill({ color });
-    if (item.item_level >= 8) {
-      bg.stroke({ color: 0xFFD700, width: 2 });
-    }
-    container.addChild(bg);
+    const iconSize = CELL_SIZE;
 
     if (item.image_url) {
-      const iconSize = CELL_SIZE * 0.65;
       loadItemTexture(item.image_url, iconSize).then((texture) => {
         if (texture && !container.destroyed) {
           const sprite = new Sprite(texture);
           sprite.width = iconSize;
           sprite.height = iconSize;
           sprite.anchor.set(0.5);
-          sprite.y = -2;
           sprite.roundPixels = true;
-          container.addChild(sprite);
+          container.addChildAt(sprite, 0);
         }
       });
     } else {
       const themeIcon = new Text({
         text: getThemeEmoji(item.theme_slug),
-        style: new TextStyle({ fontSize: 20 }),
+        style: new TextStyle({ fontSize: Math.round(CELL_SIZE * 0.55) }),
       });
       themeIcon.anchor.set(0.5);
-      themeIcon.y = -8;
       container.addChild(themeIcon);
+    }
+
+    if (item.item_level >= 8) {
+      const frame = new Graphics();
+      frame.roundRect(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE, 10);
+      frame.stroke({ color: 0xFFD700, width: 2 });
+      container.addChild(frame);
     }
 
     // ── Drag & Drop ──
@@ -839,11 +815,6 @@ export function GameField() {
     container.eventMode = 'static';
     container.cursor = 'pointer';
 
-    const bg = new Graphics();
-    bg.roundRect(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE, 10);
-    bg.fill({ color: themeCellBgColor(gen.theme_id) });
-    container.addChild(bg);
-
     const slug = gen.theme?.slug;
     const imageUrl = gen.image_url ?? (slug ? getGeneratorImageUrl(slug) : null);
 
@@ -856,23 +827,18 @@ export function GameField() {
     container.addChild(chargeText);
     generatorChargeTextRef.current.set(gen.id, chargeText);
 
-    /** Icon between background (index 0) and charge label (top). */
-    const insertGeneratorIcon = (icon: Container) => {
-      container.addChildAt(icon, 1);
-    };
+    const iconSize = CELL_SIZE;
 
     const addEmojiIcon = () => {
       const icon = new Text({
         text: getThemeEmoji(slug ?? ''),
-        style: new TextStyle({ fontSize: 22 }),
+        style: new TextStyle({ fontSize: Math.round(CELL_SIZE * 0.5) }),
       });
       icon.anchor.set(0.5);
-      icon.y = -6;
-      insertGeneratorIcon(icon);
+      container.addChildAt(icon, 0);
     };
 
     if (imageUrl) {
-      const iconSize = CELL_SIZE * 0.55;
       loadItemTexture(imageUrl, iconSize).then((texture) => {
         if (container.destroyed) return;
         if (texture) {
@@ -880,9 +846,8 @@ export function GameField() {
           sprite.width = iconSize;
           sprite.height = iconSize;
           sprite.anchor.set(0.5);
-          sprite.y = -4;
           sprite.roundPixels = true;
-          insertGeneratorIcon(sprite);
+          container.addChildAt(sprite, 0);
         } else {
           addEmojiIcon();
         }
