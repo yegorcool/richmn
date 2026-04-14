@@ -39,7 +39,7 @@ export interface Generator {
   /** Theme generator icon from API; fallback to Iconify by slug in GameField. */
   image_url?: string | null;
   /** Present when API loads `theme` relation (e.g. game state). */
-  theme?: { id: number; slug: string; name: string };
+  theme?: { id: number; slug: string; name: string; accent_color?: string };
 }
 
 export interface ItemDefinitionMap {

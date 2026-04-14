@@ -22,6 +22,25 @@
         </div>
 
         <div class="form-group">
+            <label for="accent_color">Акцентный цвет набора</label>
+            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+                <select name="accent_color" id="accent_color" required class="input-block" style="max-width:20rem;">
+                    @foreach(\App\Models\Theme::accentColorOptions() as $key => $label)
+                        <option value="{{ $key }}" data-hex="{{ \App\Models\Theme::accentSwatchHex($key) }}"
+                            {{ old('accent_color', $theme?->accent_color ?? 'hot_pink') === $key ? 'selected' : '' }}>
+                            {{ $label }}
+                        </option>
+                    @endforeach
+                </select>
+                <span id="accent-swatch" title="Превью цвета"
+                      style="width:36px;height:36px;border-radius:var(--admin-radius-sm,8px);border:2px solid var(--admin-border,#3d4454);flex-shrink:0;"></span>
+            </div>
+            <p style="color:var(--admin-muted); font-size:0.8125rem; margin-top:0.35rem;">
+                Используется при AI-генерации иконок предметов и генератора — разные наборы визуально отличаются.
+            </p>
+        </div>
+
+        <div class="form-group">
             <label for="generator_name">Название генератора</label>
             <input type="text" name="generator_name" id="generator_name" value="{{ old('generator_name', $theme?->generator_name) }}" required class="input-block">
         </div>
@@ -80,6 +99,21 @@
         <button type="submit" class="btn btn-primary">{{ $theme ? 'Сохранить' : 'Создать' }}</button>
     </form>
 </div>
+
+<script>
+(function() {
+    const sel = document.getElementById('accent_color');
+    const sw = document.getElementById('accent-swatch');
+    if (!sel || !sw) return;
+    function sync() {
+        const opt = sel.options[sel.selectedIndex];
+        const hex = opt && opt.dataset.hex ? opt.dataset.hex : '#ccc';
+        sw.style.background = hex;
+    }
+    sel.addEventListener('change', sync);
+    sync();
+})();
+</script>
 
 @if($theme)
 <div class="card" style="margin-top:1rem;">

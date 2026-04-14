@@ -35,7 +35,12 @@ class IconGeneratorService
             throw new RuntimeException('OPENAI_API_KEY is not configured');
         }
 
-        $prompt = $this->buildPrompt($item->name, $item->level, $theme->name);
+        $prompt = $this->buildPrompt(
+            $item->name,
+            $item->level,
+            $theme->name,
+            Theme::normalizeAccentColor($theme->accent_color)
+        );
         $referenceFiles = $this->getReferenceFiles();
 
         if (empty($referenceFiles)) {
@@ -58,7 +63,11 @@ class IconGeneratorService
             throw new RuntimeException('OPENAI_API_KEY is not configured');
         }
 
-        $prompt = $this->buildGeneratorPrompt($theme->generator_name, $theme->name);
+        $prompt = $this->buildGeneratorPrompt(
+            $theme->generator_name,
+            $theme->name,
+            Theme::normalizeAccentColor($theme->accent_color)
+        );
         $referenceFiles = $this->getReferenceFiles();
 
         if (empty($referenceFiles)) {
@@ -72,14 +81,17 @@ class IconGeneratorService
         return $this->saveGeneratorIcon($resizedPng, $theme->slug);
     }
 
-    private function buildGeneratorPrompt(string $generatorName, string $themeName): string
+    private function buildGeneratorPrompt(string $generatorName, string $themeName, string $accentColorKey): string
     {
+        $accent = Theme::accentColorPromptFragment($accentColorKey);
+
         return implode(' ', [
             "A single game icon of a merge-2 generator machine: \"{$generatorName}\".",
             "Theme collection: {$themeName}.",
             'Looks like a playful appliance or station that produces items, not a single product.',
-            'Vivid saturated candy colors: hot pink, lime green, sky blue, sunny yellow accents;',
-            'high chroma, no brown, sepia, or dull earth tones.',
+            "Theme signature color (must dominate): {$accent}",
+            'Small secondary accents may use one contrasting candy color; high chroma;',
+            'no brown, sepia, or dull earth tones.',
             'Glossy enamel or plastic finish, strong specular highlights, jewel shine, subtle glow,',
             'juicy polished mobile-game look.',
             'Match reference images for outline weight, soft 3D form, and cartoon proportions only.',
@@ -159,8 +171,10 @@ class IconGeneratorService
         return $b64;
     }
 
-    private function buildPrompt(string $itemName, int $level, string $themeName): string
+    private function buildPrompt(string $itemName, int $level, string $themeName, string $accentColorKey): string
     {
+        $accent = Theme::accentColorPromptFragment($accentColorKey);
+
         $levelDescription = match (true) {
             $level <= 3 => 'Simple, small, crisp silhouette with punchy color.',
             $level <= 6 => 'Moderately detailed, richer hues and cleaner shapes.',
@@ -172,8 +186,9 @@ class IconGeneratorService
             "A single game icon of \"{$itemName}\" for a colorful merge-2 mobile game.",
             "{$themeName} collection, level {$level} of 10.",
             $levelDescription,
-            'Palette: vivid hot pink, lime green, sky blue, sunny yellow; saturated and cheerful;',
-            'no brown, sepia, or muddy neutrals.',
+            "Theme signature color (must dominate the icon): {$accent}",
+            'Secondary details may use one small contrasting candy accent for pop;',
+            'saturated and cheerful; no brown, sepia, or muddy neutrals.',
             'Glossy surfaces, bright specular hits, soft inner glow, jewel-like shine,',
             'juicy polished casual-game rendering.',
             'Match reference images for thick dark outlines, soft 3D shading, and cartoon proportions only.',

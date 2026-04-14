@@ -11,6 +11,7 @@ use App\Services\IconGeneratorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class GameConfigController extends Controller
 {
@@ -32,6 +33,7 @@ class GameConfigController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:themes,slug',
+            'accent_color' => ['required', 'string', Rule::in(Theme::accentColorKeys())],
             'generator_name' => 'required|string|max:255',
             'unlock_level' => 'required|integer|min:1',
             'is_active' => 'boolean',
@@ -75,6 +77,7 @@ class GameConfigController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:themes,slug,' . $theme->id,
+            'accent_color' => ['required', 'string', Rule::in(Theme::accentColorKeys())],
             'generator_name' => 'required|string|max:255',
             'unlock_level' => 'required|integer|min:1',
             'is_active' => 'boolean',

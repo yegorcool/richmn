@@ -25,7 +25,7 @@ class GameController extends Controller
 
         $gameInit->seedStarterGenerators($user);
 
-        $items = $user->items()->with('theme:id,slug,name,chain_config')->get();
+        $items = $user->items()->with('theme:id,slug,name,chain_config,accent_color')->get();
         $itemDefinitions = ItemDefinition::whereIn(
             'theme_id',
             $items->pluck('theme_id')->unique()->merge(
@@ -42,7 +42,7 @@ class GameController extends Controller
             return $itemArray;
         });
 
-        $generators = $user->generators()->with('theme:id,slug,name,generator_image_url')->get();
+        $generators = $user->generators()->with('theme:id,slug,name,generator_image_url,accent_color')->get();
         foreach ($generators as $generator) {
             $generator->refreshCooldownIfExpired();
         }
@@ -54,7 +54,7 @@ class GameController extends Controller
             'energy_max' => config('game.energy.max'),
             'energy_recovery_seconds' => $energy->getRecoverySecondsRemaining($user),
             'grid' => config('game.grid'),
-            'item_definitions' => ItemDefinition::with('theme:id,slug')
+            'item_definitions' => ItemDefinition::with('theme:id,slug,accent_color')
                 ->get()
                 ->groupBy('theme_id')
                 ->map(fn($defs) => $defs->map(fn($d) => [
@@ -256,7 +256,7 @@ class GameController extends Controller
         if ($generator->grid_x === $gx && $generator->grid_y === $gy) {
             return response()->json([
                 'success' => true,
-                'generator' => $this->generatorToClientArray($generator->load('theme:id,slug,name,generator_image_url')),
+                'generator' => $this->generatorToClientArray($generator->load('theme:id,slug,name,generator_image_url,accent_color')),
             ]);
         }
 
@@ -287,7 +287,7 @@ class GameController extends Controller
         return response()->json([
             'success' => true,
             'generator' => $this->generatorToClientArray(
-                $generator->fresh()->load('theme:id,slug,name,generator_image_url')
+                $generator->fresh()->load('theme:id,slug,name,generator_image_url,accent_color')
             ),
         ]);
     }
@@ -297,7 +297,7 @@ class GameController extends Controller
      */
     private function generatorToClientArray(Generator $generator): array
     {
-        $generator->loadMissing('theme:id,slug,name,generator_image_url');
+        $generator->loadMissing('theme:id,slug,name,generator_image_url,accent_color');
         $data = $generator->toArray();
         $data['image_url'] = $generator->theme?->generator_image_path;
 

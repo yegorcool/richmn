@@ -13,6 +13,7 @@
                 <th>ID</th>
                 <th>Название</th>
                 <th>Slug</th>
+                <th style="width:72px;">Цвет</th>
                 <th>Генератор</th>
                 <th style="width:56px;">Ик. ген.</th>
                 <th>Разблокировка</th>
@@ -39,6 +40,13 @@
                 <td>{{ $theme->id }}</td>
                 <td>{{ $theme->name }}</td>
                 <td><code>{{ $theme->slug }}</code></td>
+                <td>
+                    @php
+                        $__accent = \App\Models\Theme::normalizeAccentColor($theme->accent_color ?? null);
+                    @endphp
+                    <span title="{{ \App\Models\Theme::accentColorOptions()[$__accent] }}"
+                          style="display:inline-block;width:28px;height:28px;border-radius:6px;background:{{ \App\Models\Theme::accentSwatchHex($__accent) }};border:1px solid var(--admin-border,#3d4454);vertical-align:middle;"></span>
+                </td>
                 <td>{{ $theme->generator_name }}</td>
                 <td>
                     @if($theme->generator_image_path)
