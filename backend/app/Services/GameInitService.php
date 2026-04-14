@@ -10,6 +10,18 @@ use Illuminate\Support\Facades\DB;
 class GameInitService
 {
     /**
+     * Fixed starter chains (same five as ItemDefinitionSeeder). Order = left-to-right on the field.
+     * Not filtered by is_active so new players always get five generators when these rows exist.
+     */
+    private const STARTER_THEME_SLUGS = [
+        'coffee',
+        'bakery',
+        'products',
+        'fabrics',
+        'pottery',
+    ];
+
+    /**
      * Starting positions for the 5 initial generators on the 6x8 grid.
      * Bottom row of five cells so the player has room above.
      */
@@ -63,25 +75,22 @@ class GameInitService
     }
 
     /**
-     * Prefer active themes; if none (e.g. admin disabled all), fall back so new players are not stuck with an empty field.
+     * Themes for the initial five generators (by slug). Missing slugs are skipped.
      *
      * @return \Illuminate\Support\Collection<int, Theme>
      */
     private function starterThemes()
     {
-        $active = Theme::query()
-            ->where('is_active', true)
-            ->orderBy('unlock_level')
-            ->limit(5)
-            ->get();
+        $slugs = self::STARTER_THEME_SLUGS;
 
-        if ($active->isNotEmpty()) {
-            return $active;
-        }
+        $bySlug = Theme::query()
+            ->whereIn('slug', $slugs)
+            ->get()
+            ->keyBy('slug');
 
-        return Theme::query()
-            ->orderBy('unlock_level')
-            ->limit(5)
-            ->get();
+        return collect($slugs)
+            ->map(fn (string $slug) => $bySlug->get($slug))
+            ->filter()
+            ->values();
     }
 }
