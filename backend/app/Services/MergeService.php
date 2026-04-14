@@ -72,6 +72,7 @@ class MergeService
                 'valid' => true,
                 'new_item' => $finalItem->fresh()->load('theme'),
                 'chain_length' => $chainLength,
+                'consumed_ids' => $chainResult['consumed_ids'] ?? [],
                 'energy' => $this->energyService->getCurrentEnergy($user),
                 'experience_gained' => $expGained,
             ];
@@ -82,16 +83,17 @@ class MergeService
     {
         $theme = $item->theme;
         if ($item->item_level >= $theme->getMaxLevel()) {
-            return ['chain_length' => 0, 'final_item' => $item];
+            return ['chain_length' => 0, 'final_item' => $item, 'consumed_ids' => []];
         }
 
         $adjacent = $this->getAdjacentItems($user, $item);
         $matchingItem = $adjacent->first(fn(Item $adj) => $adj->canMergeWith($item));
 
         if (!$matchingItem) {
-            return ['chain_length' => 0, 'final_item' => $item];
+            return ['chain_length' => 0, 'final_item' => $item, 'consumed_ids' => []];
         }
 
+        $consumedId = $matchingItem->id;
         $newLevel = $item->item_level + 1;
         $targetX = $item->grid_x;
         $targetY = $item->grid_y;
@@ -112,6 +114,7 @@ class MergeService
         return [
             'chain_length' => 1 + ($further['chain_length'] ?? 0),
             'final_item' => $further['final_item'] ?? $chainItem,
+            'consumed_ids' => array_merge([$consumedId], $further['consumed_ids'] ?? []),
         ];
     }
 

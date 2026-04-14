@@ -107,6 +107,7 @@ class GameController extends Controller
                 'item_name' => $itemDef?->name,
             ]),
             'chain_length' => $result['chain_length'],
+            'consumed_ids' => $result['consumed_ids'] ?? [],
             'energy' => $result['energy'],
             'experience_gained' => $result['experience_gained'],
             'character_line' => $characterLine,
