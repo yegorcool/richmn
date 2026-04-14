@@ -7,6 +7,7 @@ use App\Models\Character;
 use App\Models\CharacterLine;
 use App\Models\ItemDefinition;
 use App\Models\Theme;
+use App\Services\IconGeneratorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -195,6 +196,30 @@ class GameConfigController extends Controller
         $this->syncChainConfig($theme);
 
         return redirect()->route('admin.item-definitions', $theme)->with('success', 'Предмет удалён');
+    }
+
+    public function generateIcon(Theme $theme, ItemDefinition $itemDefinition, IconGeneratorService $service)
+    {
+        try {
+            if ($itemDefinition->image_url && !str_starts_with($itemDefinition->image_url, 'http')) {
+                Storage::disk('public')->delete($itemDefinition->image_url);
+            }
+
+            $relativePath = $service->generateItemIcon($itemDefinition, $theme);
+
+            $itemDefinition->update(['image_url' => $relativePath]);
+            $this->syncChainConfig($theme);
+
+            return response()->json([
+                'success' => true,
+                'image_url' => '/storage/' . $relativePath,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     private function syncChainConfig(Theme $theme): void

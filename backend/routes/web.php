@@ -39,6 +39,7 @@ Route::prefix('admin')->group(function () {
         Route::get('themes/{theme}/items/{itemDefinition}/edit', [GameConfigController::class, 'editItemDefinition'])->name('admin.item-definitions.edit');
         Route::put('themes/{theme}/items/{itemDefinition}', [GameConfigController::class, 'updateItemDefinition'])->name('admin.item-definitions.update');
         Route::delete('themes/{theme}/items/{itemDefinition}', [GameConfigController::class, 'deleteItemDefinition'])->name('admin.item-definitions.delete');
+        Route::post('themes/{theme}/items/{itemDefinition}/generate-icon', [GameConfigController::class, 'generateIcon'])->name('admin.item-definitions.generate-icon');
 
         Route::get('characters', [GameConfigController::class, 'characters'])->name('admin.characters');
         Route::get('characters/{character}/lines', [GameConfigController::class, 'characterLines'])->name('admin.character-lines');
