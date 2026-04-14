@@ -247,6 +247,12 @@ export function GameField() {
       let elapsed = 0;
 
       const tick = (dt: any) => {
+        if (target.destroyed) {
+          app.ticker.remove(tick);
+          resolve();
+          return;
+        }
+
         elapsed += dt.deltaMS ?? 16.67;
         const t = Math.min(elapsed / duration, 1);
         const e = easing(t);
