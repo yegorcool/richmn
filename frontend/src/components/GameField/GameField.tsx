@@ -14,6 +14,12 @@ const GENERATOR_DRAG_THRESHOLD_PX = 12;
 
 const textureCache = new Map<string, Texture>();
 
+/** Cache-bust static item/generator art when assets are replaced on the server. */
+function withItemImageVersion(imageUrl: string): string {
+  const join = imageUrl.includes('?') ? '&' : '?';
+  return `${imageUrl}${join}v=1`;
+}
+
 /** Iconify SVGs default to a small intrinsic size; rasterize at ~display×DPR so Pixi scaling stays sharp. */
 function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
   if (!imageUrl.includes('api.iconify.design') || !/\.svg(\?|$)/i.test(imageUrl)) {
@@ -26,7 +32,7 @@ function resolveTextureUrl(imageUrl: string, displayLogicalPx: number): string {
 }
 
 async function loadItemTexture(imageUrl: string, displayLogicalPx: number): Promise<Texture | null> {
-  const resolved = resolveTextureUrl(imageUrl, displayLogicalPx);
+  const resolved = resolveTextureUrl(withItemImageVersion(imageUrl), displayLogicalPx);
   if (textureCache.has(resolved)) {
     return textureCache.get(resolved)!;
   }
