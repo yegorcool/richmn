@@ -784,9 +784,6 @@ export function GameField() {
         };
 
         const savedItems = [{ ...item }, { ...targetItem }];
-        const prevEnergy = energyRef.current;
-        energyRef.current = Math.max(0, energyRef.current - 1);
-        setEnergy(energyRef.current);
         removeItems([item.id, targetItem.id]);
         addItem(optimisticItem);
 
@@ -804,8 +801,6 @@ export function GameField() {
         }).catch(() => {
           removeItems([tempId]);
           savedItems.forEach((si) => addItem(si));
-          energyRef.current = prevEnergy;
-          setEnergy(prevEnergy);
         });
       } else if (targetItem || generatorsRef.current.some((g) => g.grid_x === gx && g.grid_y === gy)) {
         container.x = drag.startX;

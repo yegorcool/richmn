@@ -6,7 +6,6 @@ return [
         'recovery_minutes' => (int) env('ENERGY_RECOVERY_MINUTES', 3),
         'ad_refill' => (int) env('ENERGY_AD_REFILL', 10),
         'ad_daily_limit' => (int) env('ENERGY_AD_DAILY_LIMIT', 5),
-        'merge_cost' => (int) env('MERGE_ENERGY_COST', 1),
     ],
 
     'orders' => [

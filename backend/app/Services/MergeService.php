@@ -31,11 +31,6 @@ class MergeService
             return ['valid' => false, 'error' => 'Items already at max level'];
         }
 
-        $currentEnergy = $this->energyService->getCurrentEnergy($user);
-        if ($currentEnergy < config('game.energy.merge_cost')) {
-            return ['valid' => false, 'error' => 'Not enough energy'];
-        }
-
         return ['valid' => true, 'item1' => $item1, 'item2' => $item2];
     }
 
@@ -50,8 +45,6 @@ class MergeService
         $item2 = $validation['item2'];
 
         return DB::transaction(function () use ($user, $item1, $item2) {
-            $this->energyService->spendEnergy($user, config('game.energy.merge_cost'));
-
             $newLevel = $item1->item_level + 1;
             $targetX = $item2->grid_x;
             $targetY = $item2->grid_y;
