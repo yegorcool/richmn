@@ -69,10 +69,11 @@ export function GameField() {
     dragging: boolean;
   } | null>(null);
   const animLayerRef = useRef<Container | null>(null);
-  const tapQueueRef = useRef<number[]>([]);
+  const tapQueueRef = useRef<{ generatorId: number; tempId: number; cellKey: string }[]>([]);
   const tapProcessingRef = useRef(false);
   const tapFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animatingItemIdsRef = useRef<Set<number>>(new Set());
+  const reservedCellsRef = useRef<Set<string>>(new Set());
   const moveFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generatorTooltipDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [generatorTooltip, setGeneratorTooltip] = useState<{
@@ -418,6 +419,31 @@ export function GameField() {
 
   // ── Tap Queue ────────────────────────────────────────────
 
+  const NEIGHBOR_OFFSETS: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+
+  const findLocalEmptySlot = (genX: number, genY: number): { x: number; y: number } | null => {
+    const occupied = new Set<string>();
+    for (const it of itemsRef.current) occupied.add(`${it.grid_x},${it.grid_y}`);
+    for (const g of generatorsRef.current) occupied.add(`${g.grid_x},${g.grid_y}`);
+    for (const key of reservedCellsRef.current) occupied.add(key);
+
+    for (const [dx, dy] of NEIGHBOR_OFFSETS) {
+      const x = genX + dx;
+      const y = genY + dy;
+      if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT && !occupied.has(`${x},${y}`)) {
+        return { x, y };
+      }
+    }
+
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+      for (let x = 0; x < GRID_WIDTH; x++) {
+        if (!occupied.has(`${x},${y}`)) return { x, y };
+      }
+    }
+
+    return null;
+  };
+
   const showGeneratorNotReadyTooltip = (generatorId: number, cooldownUntil: string | null | undefined) => {
     if (generatorTooltipDismissRef.current) {
       clearTimeout(generatorTooltipDismissRef.current);
@@ -452,21 +478,38 @@ export function GameField() {
     tapProcessingRef.current = true;
 
     const batch = tapQueueRef.current.splice(0);
-    const grouped = new Map<number, number>();
-    for (const gid of batch) {
-      grouped.set(gid, (grouped.get(gid) ?? 0) + 1);
+
+    type GroupEntry = { generatorId: number; entries: { tempId: number; cellKey: string }[] };
+    const groups: GroupEntry[] = [];
+    for (const entry of batch) {
+      const last = groups[groups.length - 1];
+      if (last && last.generatorId === entry.generatorId) {
+        last.entries.push({ tempId: entry.tempId, cellKey: entry.cellKey });
+      } else {
+        groups.push({ generatorId: entry.generatorId, entries: [{ tempId: entry.tempId, cellKey: entry.cellKey }] });
+      }
     }
 
-    for (const [generatorId, count] of grouped) {
+    for (const group of groups) {
+      const { generatorId, entries } = group;
+      const count = entries.length;
+      const tempIds = entries.map((e) => e.tempId);
+      const cellKeys = entries.map((e) => e.cellKey);
+
       try {
         const result = await gameApi.tapGeneratorBatch(generatorId, count);
 
         if (!result.success) {
-          const remaining = tapQueueRef.current.length;
-          const restoreCount = remaining + count;
+          removeItems(tempIds);
+          cellKeys.forEach((k) => reservedCellsRef.current.delete(k));
+
+          const remainingEntries = tapQueueRef.current.splice(0);
+          removeItems(remainingEntries.map((e) => e.tempId));
+          remainingEntries.forEach((e) => reservedCellsRef.current.delete(e.cellKey));
+
+          const restoreCount = count + remainingEntries.length;
           energyRef.current += restoreCount;
           setEnergy(energyRef.current);
-          tapQueueRef.current.length = 0;
 
           const sprite = generatorSpritesRef.current.get(generatorId);
           if (sprite) {
@@ -482,27 +525,11 @@ export function GameField() {
 
         if (result.generator) replaceGenerator(result.generator);
 
-        for (const spawnedItem of result.items) {
-          const itemId = spawnedItem.id;
-          animatingItemIdsRef.current.add(itemId);
-          addItem(spawnedItem);
+        removeItems(tempIds);
+        cellKeys.forEach((k) => reservedCellsRef.current.delete(k));
 
-          const gen = generatorsRef.current.find((g) => g.id === generatorId);
-          const genPos = gen ? gridToPixel(gen.grid_x, gen.grid_y) : gridToPixel(0, 0);
-          const itemPos = gridToPixel(spawnedItem.grid_x, spawnedItem.grid_y);
-
-          playOverlaySpawnAnimation(
-            spawnedItem.theme_id,
-            spawnedItem.image_url,
-            spawnedItem.theme_slug,
-            genPos.x, genPos.y,
-            itemPos.x, itemPos.y,
-            () => {
-              animatingItemIdsRef.current.delete(itemId);
-              const sprite = itemSpritesRef.current.get(itemId);
-              if (sprite) sprite.alpha = 1;
-            },
-          );
+        for (const realItem of result.items) {
+          addItem(realItem);
         }
 
         const pending = tapQueueRef.current.length;
@@ -513,10 +540,16 @@ export function GameField() {
           err && typeof err === 'object' && 'response' in err &&
           (err as { response?: { status?: number } }).response?.status === 403;
 
-        const restoreCount = tapQueueRef.current.length + count;
+        removeItems(tempIds);
+        cellKeys.forEach((k) => reservedCellsRef.current.delete(k));
+
+        const remainingEntries = tapQueueRef.current.splice(0);
+        removeItems(remainingEntries.map((e) => e.tempId));
+        remainingEntries.forEach((e) => reservedCellsRef.current.delete(e.cellKey));
+
+        const restoreCount = count + remainingEntries.length;
         energyRef.current += restoreCount;
         setEnergy(energyRef.current);
-        tapQueueRef.current.length = 0;
 
         if (is403) {
           platform.hapticFeedback('notification');
@@ -551,11 +584,51 @@ export function GameField() {
       return;
     }
 
+    const gen = generatorsRef.current.find((g) => g.id === generatorId);
+    if (!gen) return;
+
+    const slot = findLocalEmptySlot(gen.grid_x, gen.grid_y);
+    if (!slot) return;
+
     energyRef.current -= 1;
     setEnergy(energyRef.current);
     platform.hapticFeedback('selection');
 
-    tapQueueRef.current.push(generatorId);
+    const cellKey = `${slot.x},${slot.y}`;
+    reservedCellsRef.current.add(cellKey);
+
+    const tempId = -(Date.now() + Math.random());
+    const themeSlug = gen.theme?.slug ?? '';
+    const optimisticItem: GameItem = {
+      id: tempId,
+      theme_id: gen.theme_id,
+      theme_slug: themeSlug,
+      item_level: 1,
+      grid_x: slot.x,
+      grid_y: slot.y,
+      image_url: null,
+      item_name: null,
+    };
+
+    animatingItemIdsRef.current.add(tempId);
+    addItem(optimisticItem);
+
+    const genPos = gridToPixel(gen.grid_x, gen.grid_y);
+    const itemPos = gridToPixel(slot.x, slot.y);
+    playOverlaySpawnAnimation(
+      gen.theme_id,
+      null,
+      themeSlug,
+      genPos.x, genPos.y,
+      itemPos.x, itemPos.y,
+      () => {
+        animatingItemIdsRef.current.delete(tempId);
+        const s = itemSpritesRef.current.get(tempId);
+        if (s) s.alpha = 1;
+      },
+    );
+
+    tapQueueRef.current.push({ generatorId, tempId, cellKey });
     scheduleTapFlush();
   };
 
