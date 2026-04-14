@@ -90,12 +90,15 @@ class IconGeneratorService
             "Theme collection: {$themeName}.",
             'Looks like a playful appliance or station that produces items, not a single product.',
             "Theme signature color — use as a strong accent, not a flat recolor of everything: {$accent}",
-            'It may dominate large panels, lights, trim, or energy effects, or stay as the main vivid accent alongside believable materials (metal, glass, wood, coffee tones) when those fit the theme.',
-            'High chroma where it helps readability; avoid muddy gray mush overall.',
-            'Glossy enamel or plastic where appropriate, strong specular highlights, jewel shine on accents, subtle glow,',
-            'juicy polished mobile-game look.',
-            'Match reference images for outline weight, soft 3D form, and cartoon proportions only.',
-            'Single centered object, no text, no letters, no background elements.',
+            'It may dominate large panels, lights, trim, or energy effects, or stay as a clear accent alongside believable materials (metal, glass, wood, coffee tones) when those fit the theme.',
+            'Moderate, pleasant saturation — readable on screen but not neon or acid; no fluorescent candy colors; avoid muddy gray mush overall.',
+            'Glossy enamel or plastic where appropriate, soft specular highlights and gentle sheen on accents, subtle glow,',
+            'polished casual-game look with restrained color intensity.',
+            'Thin uniform black outline (hairline to fine stroke) around the entire outer silhouette; crisp cartoon stroke, not thick or heavy.',
+            'Soft 3D form and cartoon proportions; if reference images exist, match their form language only.',
+            'Fully transparent background — alpha clear everywhere except the drawn pixels of the machine; no solid fill, gradient slab, vignette, or color card behind it.',
+            'No ground plane, mat, pedestal, platform, or decorative base as a separate backdrop — only the generator graphic itself.',
+            'Single centered object, no text, no letters, no extra scenery.',
         ]);
     }
 
@@ -176,24 +179,27 @@ class IconGeneratorService
         $accent = Theme::accentColorPromptFragment($accentColorKey);
 
         $levelDescription = match (true) {
-            $level <= 3 => 'Simple, small, crisp silhouette; clear readable colors.',
-            $level <= 6 => 'Moderately detailed, richer hues and cleaner shapes.',
-            $level <= 9 => 'Elaborate, richly detailed, vivid accents and contrast where appropriate.',
-            default => 'Premium showpiece: prismatic highlights, extra gloss, starry sparkle hints.',
+            $level <= 3 => 'Simple, small, crisp silhouette; clear readable colors, slightly softened saturation.',
+            $level <= 6 => 'Moderately detailed, richer but still natural-looking hues and cleaner shapes.',
+            $level <= 9 => 'Elaborate, richly detailed; accents and contrast where appropriate, still avoiding neon or acid tones.',
+            default => 'Premium showpiece: refined highlights, soft gloss, subtle sparkle — elegant, not loud.',
         };
 
         return implode(' ', [
-            "A single game icon of \"{$itemName}\" for a colorful merge-2 mobile game.",
+            "A single game icon of \"{$itemName}\" for a merge-2 mobile game with a warm, approachable palette.",
             "{$themeName} collection, level {$level} of 10.",
             $levelDescription,
             'Keep the subject\'s natural, recognizable colors when realism matters — e.g. coffee beans stay brown, bread stays golden, leaves stay green; do not dye the whole object into the theme hue if that would look wrong.',
             "Theme signature color — optional tie-in, not a forced recolor: {$accent}",
-            'Use it as the main vivid accent (rim glow, glaze, particles, trim, dishware, packaging stripe) or let it dominate only on parts where it still reads as that object.',
-            'Cheerful saturation overall; avoid dull muddy gray-only palettes.',
-            'Glossy surfaces, bright specular hits, soft inner glow, jewel-like shine where it fits the material,',
-            'juicy polished casual-game rendering.',
-            'Match reference images for thick dark outlines, soft 3D shading, and cartoon proportions only.',
-            'Single centered object, no text, no letters, no background elements.',
+            'Use it as a clear accent (rim glow, glaze, particles, trim, dishware, packaging stripe) or let it cover larger areas only where it still reads as that object.',
+            'Overall palette: pleasant, balanced saturation — not fluorescent, not oversaturated candy; still avoid dull muddy gray-only looks.',
+            'Glossy surfaces where fitting, soft specular highlights, gentle inner glow, subtle sheen on materials,',
+            'polished casual-game rendering with restrained color intensity.',
+            'Thin uniform black outline (hairline to fine stroke) around the entire outer silhouette; crisp cartoon stroke, not thick or heavy.',
+            'Soft 3D shading and cartoon proportions; if reference images exist, match their form language only.',
+            'Fully transparent background — alpha clear everywhere except the drawn pixels of the item; no solid fill, gradient slab, vignette, or color card behind it.',
+            'No ground plane, mat, pedestal, dish, circular badge, or square tile under the subject — composition is only the item itself, floating.',
+            'Single centered object, no text, no letters, no extra scenery.',
         ]);
     }
 

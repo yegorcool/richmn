@@ -12,42 +12,42 @@ class Theme extends Model
         'hot_pink' => [
             'label' => 'Розовый',
             'hex' => '#ff4d9d',
-            'prompt' => 'Accent hue: saturated hot pink and magenta — use for glow, trim, glaze, particles, or supporting props; do not recolor brown or natural subjects (e.g. beans, wood) into pink.',
+            'prompt' => 'Accent hue: soft rose-pink and muted magenta — use for glow, trim, glaze, particles, or supporting props; keep saturation moderate, not neon; do not recolor brown or natural subjects (e.g. beans, wood) into pink.',
         ],
         'lime_green' => [
             'label' => 'Зелёный',
             'hex' => '#6ee755',
-            'prompt' => 'Accent hue: vivid lime and spring green — for highlights, energy, or accents; keep plants/food their natural greens where that reads better.',
+            'prompt' => 'Accent hue: fresh spring green with a touch of yellow, not neon lime — for highlights, energy, or accents; keep plants/food their natural greens where that reads better.',
         ],
         'sky_blue' => [
             'label' => 'Голубой',
             'hex' => '#38b6ff',
-            'prompt' => 'Accent hue: bright sky blue and azure — for glass shine, vapor, trim, or magical sparkle; water and sky may stay naturally blue without forcing the whole icon monochrome.',
+            'prompt' => 'Accent hue: clear sky blue, slightly softened — for glass shine, vapor, trim, or gentle sparkle; water and sky may stay naturally blue without forcing the whole icon monochrome.',
         ],
         'sunny_yellow' => [
             'label' => 'Жёлтый',
             'hex' => '#ffe135',
-            'prompt' => 'Accent hue: clean sunny yellow and lemon — for cheerful highlights or packaging pops; golden baked goods can stay warm golden, not dyed neon yellow.',
+            'prompt' => 'Accent hue: warm butter or soft lemon, not harsh highlighter yellow — for cheerful highlights or packaging; golden baked goods stay warm golden.',
         ],
         'orange' => [
             'label' => 'Оранжевый',
             'hex' => '#ff8c32',
-            'prompt' => 'Accent hue: bold orange and tangerine — for citrus zest, trim, or glow; brown foods (coffee, chocolate, crust) keep believable browns.',
+            'prompt' => 'Accent hue: warm tangerine or apricot, not traffic-cone orange — for citrus zest, trim, or glow; brown foods (coffee, chocolate, crust) keep believable browns.',
         ],
         'violet' => [
             'label' => 'Фиолетовый',
             'hex' => '#a855f7',
-            'prompt' => 'Accent hue: rich violet and purple — for magical sheen, berries, or decorative accents; other fruits and subjects keep natural hues.',
+            'prompt' => 'Accent hue: soft violet and lavender-purple — for sheen, berries, or decorative accents; avoid electric purple; other subjects keep natural hues.',
         ],
         'cyan' => [
             'label' => 'Бирюзовый',
             'hex' => '#22d3ee',
-            'prompt' => 'Accent hue: electric cyan and aqua — for water sparkle, ice edges, tech glow, or trim; do not wash out every material into flat cyan.',
+            'prompt' => 'Accent hue: calm aqua or teal-leaning cyan, not fluorescent — for water sparkle, ice edges, tech glow, or trim; do not wash out every material into flat cyan.',
         ],
         'magenta' => [
             'label' => 'Пурпурный',
             'hex' => '#e879f9',
-            'prompt' => 'Accent hue: electric magenta and fuchsia — for vivid highlights or fantasy accents; the main product stays recognizable and naturally colored when needed.',
+            'prompt' => 'Accent hue: soft fuchsia or orchid, not neon magenta — for fantasy accents or highlights; the main product stays recognizable and naturally colored when needed.',
         ],
     ];
 
