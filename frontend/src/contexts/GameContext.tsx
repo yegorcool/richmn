@@ -150,8 +150,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // --- Granular optimistic updaters (eagerly sync refs for immediate reads) ---
 
   const addItem = useCallback((item: GameItem) => {
-    itemsRef.current = [...itemsRef.current, item];
-    setItemsRaw((prev) => [...prev, item]);
+    itemsRef.current = [...itemsRef.current.filter((i) => i.id !== item.id), item];
+    setItemsRaw((prev) => [...prev.filter((i) => i.id !== item.id), item]);
   }, []);
 
   const removeItems = useCallback((ids: number[]) => {

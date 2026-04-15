@@ -800,7 +800,7 @@ export function GameField() {
         addItem(optimisticItem);
 
         gameApi.merge(currentItem.id, targetItem.id).then((result) => {
-          removeItems([tempId]);
+          removeItems([tempId, currentItem.id, targetItem.id]);
           addItem(result.new_item);
           energyRef.current = result.energy;
           setEnergy(result.energy);
