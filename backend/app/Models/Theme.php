@@ -12,12 +12,12 @@ class Theme extends Model
         'hot_pink' => [
             'label' => 'Розовый',
             'hex' => '#ff4d9d',
-            'prompt' => 'Accent hue: soft rose-pink and muted magenta — use for glow, trim, glaze, particles, or supporting props; keep saturation moderate, not neon; do not recolor brown or natural subjects (e.g. beans, wood) into pink.',
+            'prompt' => 'Accent hue: soft rose-pink and muted magenta — use for glow, trim, glaze, particles, or supporting props; keep saturation moderate, not neon; do not recolor brown or natural subjects (e.g. wood, leather) into pink.',
         ],
         'lime_green' => [
             'label' => 'Зелёный',
             'hex' => '#6ee755',
-            'prompt' => 'Accent hue: fresh spring green with a touch of yellow, not neon lime — for highlights, energy, or accents; keep plants/food their natural greens where that reads better.',
+            'prompt' => 'Accent hue: fresh spring green with a touch of yellow, not neon lime — for highlights, energy, or accents; keep plants and organic subjects their natural greens where that reads better.',
         ],
         'sky_blue' => [
             'label' => 'Голубой',
@@ -27,12 +27,12 @@ class Theme extends Model
         'sunny_yellow' => [
             'label' => 'Жёлтый',
             'hex' => '#ffe135',
-            'prompt' => 'Accent hue: warm butter or soft lemon, not harsh highlighter yellow — for cheerful highlights or packaging; golden baked goods stay warm golden.',
+            'prompt' => 'Accent hue: warm butter or soft lemon, not harsh highlighter yellow — for cheerful highlights or packaging; warm accent areas stay softly golden, not neon.',
         ],
         'orange' => [
             'label' => 'Оранжевый',
             'hex' => '#ff8c32',
-            'prompt' => 'Accent hue: warm tangerine or apricot, not traffic-cone orange — for citrus zest, trim, or glow; brown foods (coffee, chocolate, crust) keep believable browns.',
+            'prompt' => 'Accent hue: warm tangerine or apricot, not traffic-cone orange — for citrus zest, trim, or glow; deep brown subjects (chocolate, crust, wood) keep believable browns.',
         ],
         'violet' => [
             'label' => 'Фиолетовый',
