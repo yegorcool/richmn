@@ -13,7 +13,7 @@ const FIELD_HEIGHT = GRID_HEIGHT * (CELL_SIZE + CELL_GAP) + CELL_GAP;
 const GENERATOR_DRAG_THRESHOLD_PX = 12;
 
 /** Idle “breathing” scale pulse on generators: full up+down over this many ms, every period. */
-const GENERATOR_IDLE_PULSE_MS = 4000;
+const GENERATOR_IDLE_PULSE_MS = 2000;
 const GENERATOR_IDLE_PULSE_PERIOD_MS = 10000;
 const GENERATOR_IDLE_PULSE_MAX_SCALE = 1.1;
 
