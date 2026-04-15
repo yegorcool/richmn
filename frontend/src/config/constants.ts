@@ -3,8 +3,8 @@ export const GRID_HEIGHT = 8;
 export const CELL_SIZE = 56;
 export const CELL_GAP = 4;
 
-export const ENERGY_MAX = 50;
-export const ENERGY_RECOVERY_MINUTES = 3;
+export const ENERGY_MAX = 100;
+export const ENERGY_RECOVERY_MINUTES = 1;
 
 export const PASTEL_COLORS = {
   mint: '#A8E6CF',

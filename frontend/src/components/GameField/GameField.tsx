@@ -28,9 +28,9 @@ function lerp(a: number, b: number, t: number): number {
 /** u in [0,1] over pulse window: strong up → slight down → up again → back to 1. */
 function generatorPulseScaleAtProgress(u: number): number {
   const x = Math.max(0, Math.min(1, u));
-  const peakStrong = 1.22;
-  const dip = 1.07;
-  const peakMid = 1.14;
+  const peakStrong = 1.14;
+  const dip = 1.05;
+  const peakMid = 1.09;
   if (x < 0.25) {
     const t = smoothstep01(x / 0.25);
     return lerp(1, peakStrong, t);
@@ -55,10 +55,10 @@ function generatorOutlineAlphaAtProgress(u: number): number {
 }
 
 function createGeneratorOutlineGraphics(iconSize: number): Graphics {
-  const pad = 2;
+  const pad = 5;
   const w = iconSize - pad * 2;
   const h = iconSize - pad * 2;
-  const corner = 10;
+  const corner = 9;
   const g = new Graphics();
   g.roundRect(-iconSize / 2 + pad, -iconSize / 2 + pad, w, h, corner);
   g.stroke({ width: 2.2, color: 0xf8f6f2, alpha: 0.95 });

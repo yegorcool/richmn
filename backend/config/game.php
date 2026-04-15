@@ -2,8 +2,8 @@
 
 return [
     'energy' => [
-        'max' => (int) env('ENERGY_MAX', 50),
-        'recovery_minutes' => (int) env('ENERGY_RECOVERY_MINUTES', 3),
+        'max' => (int) env('ENERGY_MAX', 100),
+        'recovery_minutes' => (int) env('ENERGY_RECOVERY_MINUTES', 1),
         'ad_refill' => (int) env('ENERGY_AD_REFILL', 10),
         'ad_daily_limit' => (int) env('ENERGY_AD_DAILY_LIMIT', 5),
     ],

@@ -3,6 +3,7 @@ import type { GameItem, Generator, Order, Character, User, ItemDefinitionMap } f
 import { gameApi } from '@/services/GameApi';
 import { apiClient } from '@/services/ApiClient';
 import { getValidTelegramWidgetQueryParams } from '@/utils/telegramWidgetAuth';
+import { ENERGY_MAX } from '@/config/constants';
 import { usePlatform } from './PlatformContext';
 
 const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
@@ -45,8 +46,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [generators, setGeneratorsRaw] = useState<Generator[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [energy, setEnergy] = useState(50);
-  const [energyMax, setEnergyMax] = useState(50);
+  const [energy, setEnergy] = useState(ENERGY_MAX);
+  const [energyMax, setEnergyMax] = useState(ENERGY_MAX);
   const [loading, setLoading] = useState(true);
   const initializedRef = useRef(false);
   const pendingMovesRef = useRef<PendingMove[]>([]);
