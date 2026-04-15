@@ -54,14 +54,18 @@ function generatorOutlineAlphaAtProgress(u: number): number {
   return Math.max(0.22, Math.min(1, wave));
 }
 
-function createGeneratorOutlineGraphics(iconSize: number): Graphics {
+function createGeneratorOutlineGraphics(iconSize: number, mode: 'active' | 'inactive'): Graphics {
   const pad = 5;
   const w = iconSize - pad * 2;
   const h = iconSize - pad * 2;
   const corner = 9;
   const g = new Graphics();
   g.roundRect(-iconSize / 2 + pad, -iconSize / 2 + pad, w, h, corner);
-  g.stroke({ width: 2.2, color: 0xf8f6f2, alpha: 0.95 });
+  const stroke =
+    mode === 'active'
+      ? { width: 2.2, color: 0xf8f6f2, alpha: 0.95 }
+      : { width: 2.2, color: 0x3a342c, alpha: 0.9 };
+  g.stroke(stroke);
   g.eventMode = 'none';
   return g;
 }
@@ -110,7 +114,7 @@ export function GameField() {
   const itemSpritesRef = useRef<Map<number, Container>>(new Map());
   const generatorSpritesRef = useRef<Map<number, Container>>(new Map());
   const generatorPulseLayerRef = useRef<Map<number, Container>>(new Map());
-  const generatorActiveOutlineRef = useRef<Map<number, Graphics>>(new Map());
+  const generatorOutlineRef = useRef<Map<number, Graphics>>(new Map());
   const generatorChargeTextRef = useRef<Map<number, Text>>(new Map());
   const generatorPulseAnchorRef = useRef<number>(Date.now());
   const generatorPulseTickerBindingRef = useRef<{
@@ -644,26 +648,31 @@ export function GameField() {
       const inPulse = cyclePos < GENERATOR_IDLE_PULSE_MS;
       const u = inPulse ? cyclePos / GENERATOR_IDLE_PULSE_MS : 0;
       const s = inPulse ? generatorPulseScaleAtProgress(u) : 1;
-      const outlineAlphaIdle = 0.42;
+      const outlineAlphaIdleActive = 0.42;
+      const outlineAlphaInactive = 0.58;
 
       layers.forEach((pulseInner, genId) => {
         if (!pulseInner.parent) return;
+        const gen = generatorsRef.current.find((g) => g.id === genId);
+        const active = !!(gen && !generatorHasActiveRechargeCooldown(gen));
         const ptr = generatorPointerRef.current;
-        if (ptr?.generatorId === genId && ptr.dragging) {
+        const dragging = ptr?.generatorId === genId && ptr.dragging;
+
+        if (dragging) {
           pulseInner.scale.set(1);
-        } else {
+        } else if (active) {
           pulseInner.scale.set(s);
+        } else {
+          pulseInner.scale.set(1);
         }
 
-        const outline = generatorActiveOutlineRef.current.get(genId);
+        const outline = generatorOutlineRef.current.get(genId);
         if (outline?.parent) {
-          const gen = generatorsRef.current.find((g) => g.id === genId);
-          const active = gen && !generatorHasActiveRechargeCooldown(gen);
-          if (!active) {
-            outline.visible = false;
+          outline.visible = true;
+          if (active) {
+            outline.alpha = inPulse ? generatorOutlineAlphaAtProgress(u) : outlineAlphaIdleActive;
           } else {
-            outline.visible = true;
-            outline.alpha = inPulse ? generatorOutlineAlphaAtProgress(u) : outlineAlphaIdle;
+            outline.alpha = outlineAlphaInactive;
           }
         }
       });
@@ -688,7 +697,7 @@ export function GameField() {
     });
     generatorSpritesRef.current.clear();
     generatorPulseLayerRef.current.clear();
-    generatorActiveOutlineRef.current.clear();
+    generatorOutlineRef.current.clear();
     generatorChargeTextRef.current.clear();
 
     const currentItems = itemsRef.current;
@@ -910,13 +919,11 @@ export function GameField() {
     generatorPulseLayerRef.current.set(gen.id, pulseInner);
 
     const iconSize = CELL_SIZE;
-    const hasActiveOutline = !generatorHasActiveRechargeCooldown(gen);
-    if (hasActiveOutline) {
-      const outline = createGeneratorOutlineGraphics(iconSize);
-      outline.alpha = 0.42;
-      pulseInner.addChild(outline);
-      generatorActiveOutlineRef.current.set(gen.id, outline);
-    }
+    const inactive = generatorHasActiveRechargeCooldown(gen);
+    const outline = createGeneratorOutlineGraphics(iconSize, inactive ? 'inactive' : 'active');
+    outline.alpha = inactive ? 0.58 : 0.42;
+    pulseInner.addChild(outline);
+    generatorOutlineRef.current.set(gen.id, outline);
 
     const chargeText = new Text({
       text: generatorUnderIconLabel(gen),
@@ -936,8 +943,10 @@ export function GameField() {
           sprite.height = iconSize;
           sprite.anchor.set(0.5);
           sprite.roundPixels = true;
-          const spriteIndex = hasActiveOutline ? 1 : 0;
-          pulseInner.addChildAt(sprite, spriteIndex);
+          if (inactive) {
+            sprite.tint = 0xc9c2b8;
+          }
+          pulseInner.addChildAt(sprite, 1);
         }
       });
     }
