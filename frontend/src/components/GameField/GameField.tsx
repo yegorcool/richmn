@@ -12,10 +12,59 @@ const FIELD_HEIGHT = GRID_HEIGHT * (CELL_SIZE + CELL_GAP) + CELL_GAP;
 /** Pixels (screen) before a press on a generator counts as a drag instead of a tap. */
 const GENERATOR_DRAG_THRESHOLD_PX = 12;
 
-/** Idle “breathing” scale pulse on generators: full up+down over this many ms, every period. */
+/** Idle pulse on generators: multi-step scale over this many ms, every full period. */
 const GENERATOR_IDLE_PULSE_MS = 2000;
-const GENERATOR_IDLE_PULSE_PERIOD_MS = 10000;
-const GENERATOR_IDLE_PULSE_MAX_SCALE = 1.1;
+const GENERATOR_IDLE_PULSE_PERIOD_MS = 5000;
+
+function smoothstep01(t: number): number {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+/** u in [0,1] over pulse window: strong up → slight down → up again → back to 1. */
+function generatorPulseScaleAtProgress(u: number): number {
+  const x = Math.max(0, Math.min(1, u));
+  const peakStrong = 1.22;
+  const dip = 1.07;
+  const peakMid = 1.14;
+  if (x < 0.25) {
+    const t = smoothstep01(x / 0.25);
+    return lerp(1, peakStrong, t);
+  }
+  if (x < 0.45) {
+    const t = smoothstep01((x - 0.25) / 0.2);
+    return lerp(peakStrong, dip, t);
+  }
+  if (x < 0.65) {
+    const t = smoothstep01((x - 0.45) / 0.2);
+    return lerp(dip, peakMid, t);
+  }
+  const t = smoothstep01((x - 0.65) / 0.35);
+  return lerp(peakMid, 1, t);
+}
+
+/** Outline alpha for active generators during pulse (same u as scale). */
+function generatorOutlineAlphaAtProgress(u: number): number {
+  const x = Math.max(0, Math.min(1, u));
+  const wave = 0.32 + 0.58 * Math.sin(Math.PI * x);
+  return Math.max(0.22, Math.min(1, wave));
+}
+
+function createGeneratorOutlineGraphics(iconSize: number): Graphics {
+  const pad = 2;
+  const w = iconSize - pad * 2;
+  const h = iconSize - pad * 2;
+  const corner = 10;
+  const g = new Graphics();
+  g.roundRect(-iconSize / 2 + pad, -iconSize / 2 + pad, w, h, corner);
+  g.stroke({ width: 2.2, color: 0xf8f6f2, alpha: 0.95 });
+  g.eventMode = 'none';
+  return g;
+}
 
 const textureCache = new Map<string, Texture>();
 
@@ -61,6 +110,7 @@ export function GameField() {
   const itemSpritesRef = useRef<Map<number, Container>>(new Map());
   const generatorSpritesRef = useRef<Map<number, Container>>(new Map());
   const generatorPulseLayerRef = useRef<Map<number, Container>>(new Map());
+  const generatorActiveOutlineRef = useRef<Map<number, Graphics>>(new Map());
   const generatorChargeTextRef = useRef<Map<number, Text>>(new Map());
   const generatorPulseAnchorRef = useRef<number>(Date.now());
   const generatorPulseTickerBindingRef = useRef<{
@@ -591,21 +641,31 @@ export function GameField() {
       if (layers.size === 0) return;
 
       const cyclePos = (Date.now() - generatorPulseAnchorRef.current) % GENERATOR_IDLE_PULSE_PERIOD_MS;
-      let s = 1;
-      if (cyclePos < GENERATOR_IDLE_PULSE_MS) {
-        const u = cyclePos / GENERATOR_IDLE_PULSE_MS;
-        const breathe = Math.sin(Math.PI * u);
-        s = 1 + (GENERATOR_IDLE_PULSE_MAX_SCALE - 1) * breathe;
-      }
+      const inPulse = cyclePos < GENERATOR_IDLE_PULSE_MS;
+      const u = inPulse ? cyclePos / GENERATOR_IDLE_PULSE_MS : 0;
+      const s = inPulse ? generatorPulseScaleAtProgress(u) : 1;
+      const outlineAlphaIdle = 0.42;
 
       layers.forEach((pulseInner, genId) => {
         if (!pulseInner.parent) return;
         const ptr = generatorPointerRef.current;
         if (ptr?.generatorId === genId && ptr.dragging) {
           pulseInner.scale.set(1);
-          return;
+        } else {
+          pulseInner.scale.set(s);
         }
-        pulseInner.scale.set(s);
+
+        const outline = generatorActiveOutlineRef.current.get(genId);
+        if (outline?.parent) {
+          const gen = generatorsRef.current.find((g) => g.id === genId);
+          const active = gen && !generatorHasActiveRechargeCooldown(gen);
+          if (!active) {
+            outline.visible = false;
+          } else {
+            outline.visible = true;
+            outline.alpha = inPulse ? generatorOutlineAlphaAtProgress(u) : outlineAlphaIdle;
+          }
+        }
       });
     };
 
@@ -628,6 +688,7 @@ export function GameField() {
     });
     generatorSpritesRef.current.clear();
     generatorPulseLayerRef.current.clear();
+    generatorActiveOutlineRef.current.clear();
     generatorChargeTextRef.current.clear();
 
     const currentItems = itemsRef.current;
@@ -848,6 +909,15 @@ export function GameField() {
     container.addChild(pulseInner);
     generatorPulseLayerRef.current.set(gen.id, pulseInner);
 
+    const iconSize = CELL_SIZE;
+    const hasActiveOutline = !generatorHasActiveRechargeCooldown(gen);
+    if (hasActiveOutline) {
+      const outline = createGeneratorOutlineGraphics(iconSize);
+      outline.alpha = 0.42;
+      pulseInner.addChild(outline);
+      generatorActiveOutlineRef.current.set(gen.id, outline);
+    }
+
     const chargeText = new Text({
       text: generatorUnderIconLabel(gen),
       style: new TextStyle({ fontSize: 10, fill: 0x666666 }),
@@ -856,8 +926,6 @@ export function GameField() {
     chargeText.y = 19;
     pulseInner.addChild(chargeText);
     generatorChargeTextRef.current.set(gen.id, chargeText);
-
-    const iconSize = CELL_SIZE;
 
     if (imageUrl) {
       loadItemTexture(imageUrl, iconSize).then((texture) => {
@@ -868,7 +936,8 @@ export function GameField() {
           sprite.height = iconSize;
           sprite.anchor.set(0.5);
           sprite.roundPixels = true;
-          pulseInner.addChildAt(sprite, 0);
+          const spriteIndex = hasActiveOutline ? 1 : 0;
+          pulseInner.addChildAt(sprite, spriteIndex);
         }
       });
     }
