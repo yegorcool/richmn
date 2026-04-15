@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Application, Container, Graphics, Text, TextStyle, FederatedPointerEvent, Sprite, Texture, Assets } from 'pixi.js';
+import { Application, Container, Graphics, Text, TextStyle, FederatedPointerEvent, Sprite, Texture, Assets, Ticker } from 'pixi.js';
 import { useGame } from '@/contexts/GameContext';
 import { usePlatform } from '@/contexts/PlatformContext';
 import { gameApi } from '@/services/GameApi';
@@ -15,7 +15,7 @@ const GENERATOR_DRAG_THRESHOLD_PX = 12;
 /** Idle “breathing” scale pulse on generators: full up+down over this many ms, every period. */
 const GENERATOR_IDLE_PULSE_MS = 4000;
 const GENERATOR_IDLE_PULSE_PERIOD_MS = 10000;
-const GENERATOR_IDLE_PULSE_MAX_SCALE = 1.06;
+const GENERATOR_IDLE_PULSE_MAX_SCALE = 1.1;
 
 const textureCache = new Map<string, Texture>();
 
@@ -63,6 +63,10 @@ export function GameField() {
   const generatorPulseLayerRef = useRef<Map<number, Container>>(new Map());
   const generatorChargeTextRef = useRef<Map<number, Text>>(new Map());
   const generatorPulseAnchorRef = useRef<number>(Date.now());
+  const generatorPulseTickerBindingRef = useRef<{
+    app: Application;
+    fn: (ticker: Ticker) => void;
+  } | null>(null);
   const dragRef = useRef<{ itemId: number; startX: number; startY: number; sprite: Container } | null>(null);
   const generatorPointerRef = useRef<{
     generatorId: number;
@@ -176,6 +180,15 @@ export function GameField() {
         clearTimeout(generatorTooltipDismissRef.current);
         generatorTooltipDismissRef.current = null;
       }
+      const pulseBind = generatorPulseTickerBindingRef.current;
+      if (pulseBind) {
+        try {
+          pulseBind.app.ticker.remove(pulseBind.fn);
+        } catch {
+          /* app/ticker may already be tearing down */
+        }
+        generatorPulseTickerBindingRef.current = null;
+      }
       if (appRef.current) {
         appRef.current.destroy(true);
         appRef.current = null;
@@ -210,39 +223,6 @@ export function GameField() {
       app.ticker.remove(tick);
     };
   }, [generators, appReady]);
-
-  useEffect(() => {
-    const app = appRef.current;
-    if (!appReady || !app) return;
-
-    const tick = () => {
-      const layers = generatorPulseLayerRef.current;
-      if (layers.size === 0) return;
-
-      const cyclePos = (Date.now() - generatorPulseAnchorRef.current) % GENERATOR_IDLE_PULSE_PERIOD_MS;
-      let s = 1;
-      if (cyclePos < GENERATOR_IDLE_PULSE_MS) {
-        const u = cyclePos / GENERATOR_IDLE_PULSE_MS;
-        const breathe = Math.sin(Math.PI * u);
-        s = 1 + (GENERATOR_IDLE_PULSE_MAX_SCALE - 1) * breathe;
-      }
-
-      layers.forEach((pulseInner, genId) => {
-        if (pulseInner.destroyed) return;
-        const ptr = generatorPointerRef.current;
-        if (ptr?.generatorId === genId && ptr.dragging) {
-          pulseInner.scale.set(1);
-          return;
-        }
-        pulseInner.scale.set(s);
-      });
-    };
-
-    app.ticker.add(tick);
-    return () => {
-      app.ticker.remove(tick);
-    };
-  }, [appReady]);
 
   const drawGrid = (app: Application) => {
     const grid = new Graphics();
@@ -590,6 +570,49 @@ export function GameField() {
     scheduleTapFlush();
   };
 
+  /** Attach idle pulse to this Pixi app once; must run after generator layers are in refs. */
+  const syncGeneratorPulseTicker = (app: Application) => {
+    const existing = generatorPulseTickerBindingRef.current;
+    if (existing?.app === app) return;
+
+    if (existing) {
+      try {
+        existing.app.ticker.remove(existing.fn);
+      } catch {
+        /* noop */
+      }
+      generatorPulseTickerBindingRef.current = null;
+    }
+
+    generatorPulseAnchorRef.current = Date.now();
+
+    const fn = (_ticker: Ticker) => {
+      const layers = generatorPulseLayerRef.current;
+      if (layers.size === 0) return;
+
+      const cyclePos = (Date.now() - generatorPulseAnchorRef.current) % GENERATOR_IDLE_PULSE_PERIOD_MS;
+      let s = 1;
+      if (cyclePos < GENERATOR_IDLE_PULSE_MS) {
+        const u = cyclePos / GENERATOR_IDLE_PULSE_MS;
+        const breathe = Math.sin(Math.PI * u);
+        s = 1 + (GENERATOR_IDLE_PULSE_MAX_SCALE - 1) * breathe;
+      }
+
+      layers.forEach((pulseInner, genId) => {
+        if (!pulseInner.parent) return;
+        const ptr = generatorPointerRef.current;
+        if (ptr?.generatorId === genId && ptr.dragging) {
+          pulseInner.scale.set(1);
+          return;
+        }
+        pulseInner.scale.set(s);
+      });
+    };
+
+    app.ticker.add(fn);
+    generatorPulseTickerBindingRef.current = { app, fn };
+  };
+
   // ── Render ────────────────────────────────────────────────
 
   const renderItems = (app: Application) => {
@@ -646,6 +669,8 @@ export function GameField() {
       app.stage.addChild(container);
       generatorSpritesRef.current.set(gen.id, container);
     });
+
+    syncGeneratorPulseTicker(app);
   };
 
   const createItemSprite = (item: GameItem): Container => {
